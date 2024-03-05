@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import itertools as it
 from typing import Generic, Iterator, TypeVar
 
