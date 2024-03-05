@@ -64,23 +64,20 @@ class TaskQueue:
     def add(self, *tasks: Task) -> None:
         for task in tasks:
             self._queue.add(task, task.priority)
-        self.run_next()
-
-    def run_next(self) -> None:
-        if len(self._running) >= self.num_simultaneous_tasks:
-            return
-        if self._queue:
-            next_pending_task = self._queue.pop()
-            self._running.append(next_pending_task)
-            self._running[-1].run()
+        self.update()
 
     def update(self) -> None:
+        # Remove any complete tasks from the running list
         for task in self._running:
             if task.is_complete():
                 self._running.remove(task)
-                if task.was_successful():
-                    # Only run the next tasks if the parent task was successful
-                    self.add(*task.next_tasks)
+                # TODO: Consider if we need to do something here depending on
+                # task success / failure
+        # Ensure that the running list is filled back up with pending tasks
+        while len(self._running) < self.num_simultaneous_tasks and self._queue:
+            next_pending_task = self._queue.pop()
+            self._running.append(next_pending_task)
+            self._running[-1].run()
 
     def __len__(self) -> int:
         return len(self._running) + len(self._queue)

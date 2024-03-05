@@ -44,7 +44,6 @@ class Task(ABC):
     def __init__(self) -> None:
         super().__init__()
         self._process: Optional[subprocess.Popen] = None  # type: ignore
-        self.next_tasks: list[Task] = []
         self.priority: int = 0
 
     @property
@@ -83,25 +82,14 @@ class Task(ABC):
         return True
 
     def __repr__(self) -> str:
-        if num_next_tasks := len(self.next_tasks):
-            return f"[Task: {self.command} + {num_next_tasks} others]"
-        else:
-            return f"[Task: {self.command}]"
+        return f"[Task: {self.command}]"
 
 
 class ReconstructTask(Task):
-    def __init__(self, timestamp: str, post_cleanup: bool = True) -> None:
+    def __init__(self, timestamp: str) -> None:
         super().__init__()
         self.timestamp = timestamp
         self.priority = 2
-        if post_cleanup:
-            self.create_followup_tasks()
-
-    def create_followup_tasks(self) -> None:
-        delete_split_task = DeleteSplitTask(self.timestamp)
-        self.next_tasks.append(delete_split_task)
-        tar_task = TarTask(self.timestamp, post_cleanup=True)
-        self.next_tasks.append(tar_task)
 
     def is_complete(self) -> bool:
         if super().is_complete():
@@ -144,16 +132,10 @@ class DeleteSplitTask(Task):
 
 
 class TarTask(Task):
-    def __init__(self, timestamp: str, post_cleanup: bool = True) -> None:
+    def __init__(self, timestamp: str) -> None:
         super().__init__()
         self.timestamp = timestamp
         self.priority = 1
-        if post_cleanup:
-            self.create_followup_tasks()
-
-    def create_followup_tasks(self) -> None:
-        delete_reconstructed_task = DeleteReconstructedTask(self.timestamp)
-        self.next_tasks.append(delete_reconstructed_task)
 
     def is_complete(self) -> bool:
         if super().is_complete():
