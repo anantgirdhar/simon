@@ -3,7 +3,7 @@
 import itertools as it
 from typing import Generic, Iterator, TypeVar
 
-from tasks import Task
+from simon.tasks import Task
 
 T = TypeVar("T")
 
@@ -18,6 +18,11 @@ class PriorityList(Generic[T]):
     """
 
     def __init__(self, num_priorities: int) -> None:
+        if num_priorities <= 0:
+            raise ValueError(
+                "The number of priorities should be positive,"
+                + f" not {num_priorities}."
+            )
         self.__list: list[T] = []
         # Create a list where each element gives the next index to insert an
         # element with the same priority as the index of that element
@@ -26,7 +31,14 @@ class PriorityList(Generic[T]):
         ] * num_priorities
 
     def add(self, item: T, priority: int = 0) -> None:
-        index = self.__priority_indices[priority]
+        if priority < 0:
+            raise ValueError("Priority should be non-negative, not {priority}")
+        try:
+            index = self.__priority_indices[priority]
+        except IndexError:
+            raise ValueError(
+                f"Priority should be less than {len(self.__priority_indices)} not {priority}"
+            )
         self.__list.insert(index, item)
         for index in range(priority, len(self.__priority_indices)):
             self.__priority_indices[index] += 1

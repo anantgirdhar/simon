@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import List
 
-import tasks
+import simon.tasks as tasks
 
 RECONSTRUCTION_DONE_MARKER_FILENAME = ".__reconstruction_done"
 

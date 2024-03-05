@@ -4,8 +4,8 @@ import sys
 import time
 from pathlib import Path
 
-from oflistener import OFListener
-from taskqueue import TaskQueue
+from simon.oflistener import OFListener
+from simon.taskqueue import TaskQueue
 
 
 def main(
