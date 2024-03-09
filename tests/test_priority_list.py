@@ -6,12 +6,6 @@ from simon.taskqueue import PriorityList
 # Test initialization
 
 
-@pytest.mark.parametrize("num_priorities", list(range(1, 10)))
-def test_empty(num_priorities: int) -> None:
-    plist: PriorityList[str] = PriorityList(num_priorities)
-    assert plist._PriorityList__list == []
-
-
 @pytest.mark.parametrize("num_priorities", [0, -1, -2, -3, -4, -5, -6])
 def test_invalid_num_priorities(num_priorities: int) -> None:
     with pytest.raises(ValueError):
@@ -32,14 +26,13 @@ def test_add_invalid_priority_negative(
 
 
 @pytest.mark.parametrize("num_priorities", range(1, 10))
-def test_add_invalid_priority_large(num_priorities: int) -> None:
+@pytest.mark.parametrize("priority_offset", [0, 1, 2, 5, 10])
+def test_add_invalid_priority_large(
+    num_priorities: int, priority_offset: int
+) -> None:
     plist: PriorityList[str] = PriorityList(num_priorities)
     with pytest.raises(ValueError):
-        plist.add("a", num_priorities)
-        plist.add("a", num_priorities + 1)
-        plist.add("a", num_priorities + 2)
-        plist.add("a", num_priorities + 5)
-        plist.add("a", num_priorities + 10)
+        plist.add("a", num_priorities + priority_offset)
 
 
 # Test adding and popping items
@@ -78,6 +71,15 @@ def test_add_pop_multiple(num_priorities: int) -> None:
         plist.pop()
         i -= 1
         assert len(plist) == i
+
+
+# Test len function
+
+
+@pytest.mark.parametrize("num_priorities", range(1, 10))
+def test_len_empty(num_priorities: int) -> None:
+    plist: PriorityList[str] = PriorityList(num_priorities)
+    assert len(plist) == 0
 
 
 # Test maintaining order
