@@ -2,7 +2,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import List
 
-from simon.tasks import Task
+from simon.task import Task
 
 RECONSTRUCTION_DONE_MARKER_FILENAME = ".__reconstruction_done"
 

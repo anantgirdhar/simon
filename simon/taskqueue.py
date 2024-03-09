@@ -1,7 +1,7 @@
 import itertools as it
 from typing import Generic, Iterator, TypeVar
 
-from simon.tasks import Task
+from simon.task import Task
 
 T = TypeVar("T")
 
