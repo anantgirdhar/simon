@@ -1,7 +1,7 @@
 import random
 
 import pytest
-from simon.taskqueue import PriorityList
+from simon.priority_list import PriorityList
 
 # Test initialization
 
