@@ -1,16 +1,28 @@
 import subprocess
-from typing import Optional
+from typing import Callable, Optional
 
 
 class Task:
     def __init__(
-        self, command: str, priority: int = 0, short_string: str = ""
+        self,
+        command: str,
+        priority: int = 0,
+        short_string: str = "",
+        completion_check: Optional[Callable[[], bool]] = None,
     ) -> None:
         super().__init__()
         self._process: Optional[subprocess.Popen] = None  # type: ignore
         self.priority = priority
         self.command = command
         self.short_string = short_string
+        if not completion_check:
+            # If no additional check is provided, then create a function that
+            # always returns False when asked if it is complete. This way, the
+            # code will always just default to the internal check (which checks
+            # whether or not the subprocess is complete).
+            self.completion_check: Callable[[], bool] = lambda: False
+        else:
+            self.completion_check = completion_check
 
     def run(self) -> None:
         """Run the task"""
@@ -22,6 +34,8 @@ class Task:
         )
 
     def is_complete(self) -> bool:
+        if self.completion_check():
+            return True
         if self._process is None:
             return False
         return_value = self._process.poll()
