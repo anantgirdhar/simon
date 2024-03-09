@@ -1,3 +1,5 @@
+import bisect
+import itertools as it
 from typing import Generic, Iterator, TypeVar
 
 T = TypeVar("T")
@@ -12,49 +14,47 @@ class PriorityList(Generic[T]):
     array.
     """
 
-    def __init__(self, num_priorities: int) -> None:
-        if num_priorities <= 0:
-            raise ValueError(
-                "The number of priorities should be positive,"
-                + f" not {num_priorities}."
-            )
-        self.__list: list[T] = []
-        # Create a list where each element gives the next index to insert an
-        # element with the same priority as the index of that element
-        self.__priority_indices = [
-            0,
-        ] * num_priorities
+    def __init__(self) -> None:
+        # Create a dictionary that stores lists of items for each priority
+        self.__items: dict[int, list[T]] = {}
+        # Also create an ordered list of all the priorities for easier access
+        self.__priorities: list[int] = []
 
     def add(self, item: T, priority: int = 0) -> None:
         if priority < 0:
             raise ValueError("Priority should be non-negative, not {priority}")
-        try:
-            index = self.__priority_indices[priority]
-        except IndexError:
-            raise ValueError(
-                f"Priority should be less than {len(self.__priority_indices)} not {priority}"
-            )
-        self.__list.insert(index, item)
-        for index in range(priority, len(self.__priority_indices)):
-            self.__priority_indices[index] += 1
+        if priority not in self.__items:
+            self.__items[priority] = []
+            bisect.insort(self.__priorities, priority)
+        self.__items[priority].append(item)
 
     def pop(self) -> T:
         if len(self) == 0:
             raise IndexError("pop from empty list")
-        item = self.__list.pop(0)
-        self.__priority_indices = [
-            max(index - 1, 0) for index in self.__priority_indices
-        ]
+        # Get the highest priority
+        priority = self.__priorities[0]
+        # Get the item from that priority
+        item = self.__items[priority].pop(0)
+        # If this priority level is empty, remove it
+        if not self.__items[priority]:
+            self.__items.pop(priority)
+            self.__priorities.pop(0)
         return item
 
     def __iter__(self) -> Iterator[T]:
-        return iter(self.__list)
+        return it.chain(
+            *(self.__items[priority] for priority in self.__priorities)
+        )
 
     def __len__(self) -> int:
-        return len(self.__list)
+        return sum(len(list_) for list_ in self.__items.values())
 
     def __str__(self) -> str:
-        return str(self.__list)
+        # Build the list of items
+        items = []
+        for priority in self.__priorities:
+            items.extend(self.__items[priority])
+        return str(items)
 
     def __repr__(self) -> str:
-        return repr(self.__list)
+        return repr(self.__items)

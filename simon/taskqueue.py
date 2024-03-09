@@ -5,12 +5,10 @@ from simon.task import Task
 
 
 class TaskQueue:
-    def __init__(
-        self, num_simultaneous_tasks: int = 6, num_priorities: int = 3
-    ) -> None:
+    def __init__(self, num_simultaneous_tasks: int = 6) -> None:
         self.num_simultaneous_tasks = num_simultaneous_tasks
         self._running: list[Task] = []
-        self._queue: PriorityList[Task] = PriorityList(num_priorities)
+        self._queue: PriorityList[Task] = PriorityList()
 
     def add(self, *tasks: Task) -> None:
         for task in tasks:
