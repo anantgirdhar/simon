@@ -24,7 +24,7 @@ class Task:
         else:
             self.completion_check = completion_check
 
-    def run(self) -> None:
+    def run(self, block: bool = False) -> None:
         """Run the task"""
         if self.is_complete():
             return
@@ -32,6 +32,8 @@ class Task:
         self._process = subprocess.Popen(
             command, shell=True, stdout=subprocess.DEVNULL
         )
+        if block:
+            self._process.wait()
 
     def is_complete(self) -> bool:
         if self.completion_check():

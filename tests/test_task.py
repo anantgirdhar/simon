@@ -261,6 +261,19 @@ def test_task_with_sleep_was_successful_after_run(
     assert task_with_sleep.was_successful() is result
 
 
+# Test blocking run
+
+
+def test_blocking_run(fixed_tmp_dir: Path, task_with_sleep: Task) -> None:
+    # Make sure that the test file does not exist before we start
+    assert (fixed_tmp_dir / TEST_FILE).is_file() is False
+    # Run the Task and block it
+    task_with_sleep.run(block=True)
+    # Check immediately and this should be done regardless of how long the
+    # sleep in the task is
+    assert task_with_sleep.was_successful()
+
+
 # Test Task equality check
 
 
