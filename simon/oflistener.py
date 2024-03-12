@@ -37,7 +37,14 @@ class OFListener:
 
     def get_new_tasks(self) -> List[Task]:
         new_tasks: List[Task] = []
-        for t in self._get_new_split_times():
+        new_split_times = self._get_new_split_times()
+        for i, t in enumerate(new_split_times):
+            if i == len(new_split_times) - 1:
+                # Remove the last split time from consideration. This is
+                # because it is possible that OpenFOAM is still writing out the
+                # last split time files, in which case, it's not ready for
+                # further processing (reconstruction) yet.
+                continue
             if self._delete_without_processing(Decimal(t)):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
@@ -77,11 +84,7 @@ class OFListener:
                 if t.is_dir() and t.name not in self._processed_split_times
             ],
             key=float,
-        )[:-1]
-        # We've removed the last split time from consideration. This is because
-        # it is possible that OpenFOAM is still writing out the last split time
-        # files, in which case, it's not ready for further processing
-        # (reconstruction) yet.
+        )
 
     def _get_new_reconstructed_times(self) -> List[str]:
         return sorted(
