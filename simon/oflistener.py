@@ -37,14 +37,15 @@ class OFListener:
 
     def get_new_tasks(self) -> List[Task]:
         new_tasks: List[Task] = []
+        # Get the current state of the files
         new_split_times = self._get_new_split_times()
-        for i, t in enumerate(new_split_times):
-            if i == len(new_split_times) - 1:
-                # Remove the last split time from consideration. This is
-                # because it is possible that OpenFOAM is still writing out the
-                # last split time files, in which case, it's not ready for
-                # further processing (reconstruction) yet.
-                continue
+        new_reconstructed_times = self._get_new_reconstructed_times()
+        new_tarred_times = self._get_new_tarred_times()
+        # Remove the last split time from consideration. This is because it is
+        # possible that OpenFOAM is still writing out the last split time
+        # files, in which case, it's not ready for further processing
+        # (reconstruction) yet.
+        for t in new_split_times[:-1]:
             if self._delete_without_processing(Decimal(t)):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
@@ -54,14 +55,16 @@ class OFListener:
             else:
                 new_tasks.append(self._create_reconstruct_task(t))
                 self._processed_split_times.append(t)
-        for t in self._get_new_reconstructed_times():
-            # TODO: Before deleting this split time, make sure that the
-            # following split time already exists
-            new_tasks.append(self._create_delete_split_task(t))
+        for t in new_reconstructed_times:
             if not self._was_successfully_tarred(t):
                 new_tasks.append(self._create_tar_task(t))
-            self._processed_reconstructed_times.append(t)
-        for t in self._get_new_tarred_times():
+            # Delete it's split time if it is not the last split time
+            if new_split_times and t != new_split_times[-1]:
+                new_tasks.append(self._create_delete_split_task(t))
+                # Mark the time as completed if the split time is deleted
+                # because the tar task has already been dealt with
+                self._processed_reconstructed_times.append(t)
+        for t in new_tarred_times:
             new_tasks.append(self._create_delete_reconstructed_task(t))
             self._processed_tarred_times.append(t)
         return new_tasks
