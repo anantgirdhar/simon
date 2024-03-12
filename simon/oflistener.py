@@ -185,6 +185,8 @@ class OFListener:
         reconstruct_command = f"reconstructPar -time {timestamp}"
         if self.case_dir != Path("."):
             reconstruct_command += f" -case {self.case_dir}"
+        if timestamp == "0":
+            reconstruct_command += " -withZero"
         reconstruction_done_marker_filepath = (
             Path(self.case_dir)
             / timestamp
