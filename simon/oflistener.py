@@ -109,6 +109,11 @@ class OFListener:
         if not self._get_new_split_times():
             print("No split times left. Deleting all processor directories...")
             Task(command=f"rm -rf {self.case_dir}/processor*").run(block=True)
+        else:
+            print("Found valid split times! Ready to proceed!")
+            # We're done because this is a cleaned directory meaning that any
+            # split times are valid because we've tried to reconstruct them
+            return
         # Further, make sure that there is a reconstructed time that can be
         # decomposed to recreate the processor directories
         reconstructed_times = self._get_new_reconstructed_times()
