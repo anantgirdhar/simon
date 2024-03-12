@@ -66,6 +66,80 @@ class OFListener:
             self._processed_tarred_times.append(t)
         return new_tasks
 
+    def get_cleanup_tasks(self) -> List[Task]:
+        # Run this function to remove any incomplete items
+        # Only run this during the case setup phase
+        new_tasks: List[Task] = []
+        # Start with removing any incomplete split times
+        # To check if a split time is incomplete, run reconstructPar on it
+        # This seems like a pretty decent indicator of whether or not it is
+        # complete
+        # There are some known issues though - if a variable (usually a
+        # species) is missing from all of the split time directories,
+        # reconstructPar still runs. This may not be desirable but hopefully
+        # this is a rare occurance and so this solution should be good enough
+        # Start with the most recent split time and work backwards from there
+        for t in reversed(self._get_new_split_times()):
+            task = self._create_reconstruct_task(t)
+            task.run(block=True)
+            if not task.was_successful():
+                # If it couldn't be reconstructed, delete it
+                new_tasks.append(self._create_delete_split_task(t))
+                # The partially reconstructed directory will get dealt with in
+                # the next segment
+                # Now try the next available split time
+                continue
+        # Now remove any incompletely reconstructed times
+        for t in self._get_new_reconstructed_times():
+            if not self._was_successfully_reconstructed(t):
+                new_tasks.append(self._create_delete_reconstructed_task(t))
+        # We could remove any in progress tars, but these should theoreticaly
+        # get dealt with when the time is tarred again (and are easier to spot)
+        return new_tasks
+
+    def ensure_case_correctness(self) -> None:
+        # Run this function to get the case setup to a point that it can be
+        # restarted from
+        # Only run this during the case setup phase
+        # First make sure the user is running this on a cleaned directory
+        if self.get_cleanup_tasks():
+            raise Exception("This is not a cleaned directory.")
+        # Remove the processor directories if there are no split times
+        # These should get recreated when the job is created
+        if not self._get_new_split_times():
+            print("No split times left. Deleting all processor directories...")
+            Task(command=f"rm -rf {self.case_dir}/processor*").run(block=True)
+        # Further, make sure that there is a reconstructed time that can be
+        # decomposed to recreate the processor directories
+        reconstructed_times = self._get_new_reconstructed_times()
+        if reconstructed_times:
+            print("Found some reconstructed times! Ready to proceed!")
+            # We're done because this is a cleaned directory meaning that any
+            # reconstructed times are complete and can be decomposed
+            return
+        # Otherwise, look for the last tarred time and try to decompose that
+        tarred_times = self._get_new_tarred_times()
+        if tarred_times:
+            # Decompose the most recent tarred time and then we're done
+            newest_tar_time = tarred_times[-1]
+            print(f"Untarring {newest_tar_time}...")
+            tar_path = f"{self.case_dir}/{newest_tar_time}.tar"
+            untar_command = f"tar -xvf {tar_path} --directory={self.case_dir}"
+            reconstruction_done_marker_filepath = (
+                Path(self.case_dir)
+                / newest_tar_time
+                / RECONSTRUCTION_DONE_MARKER_FILENAME
+            )
+            post_untar_command = f"touch {reconstruction_done_marker_filepath}"
+            command = " && ".join([untar_command, post_untar_command])
+            task = Task(command=command)
+            task.run(block=True)
+            print("Restored a reconstructed time! Ready to proceed!")
+            return
+        # If we managed to get here, then there is no suitable decomposition
+        # candidate so we can't proceed
+        raise Exception("Could not restore case directory to a good state.")
+
     def _delete_without_processing(self, timestep: Decimal) -> bool:
         # The timestep should be deleted if it is not a "multiple" of
         # self.keep_every
