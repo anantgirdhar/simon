@@ -94,13 +94,13 @@ def create_reconstructed_tars(case_dir: Path, timestamps: List[str]) -> None:
 
 def test_in_valid_provided_case_dir(decomposed_case_dir: Path) -> None:
     # This should not raise an error
-    listener = OFListener(Decimal("0.0001"), decomposed_case_dir)
+    OFListener(Decimal("0.0001"), decomposed_case_dir)
 
 
 def test_in_valid_default_case_dir(decomposed_case_dir: Path) -> None:
     os.chdir(decomposed_case_dir)
     # This should not raise an error either
-    listener = OFListener(Decimal("0.0001"))
+    OFListener(Decimal("0.0001"))
 
 
 @pytest.mark.parametrize("leave_out_dir", ["constant", "system", "processor0"])
@@ -113,7 +113,7 @@ def test_in_bad_case_dir(tmp_path: Path, leave_out_dir: str) -> None:
             continue
         (case_dir / directory).mkdir()
     with pytest.raises(ValueError):
-        listener = OFListener(Decimal("0.0001"), case_dir)
+        OFListener(Decimal("0.0001"), case_dir)
 
 
 # Test timestamp deletion check
