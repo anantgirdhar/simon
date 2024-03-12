@@ -104,16 +104,16 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "setup":
         setup(
-            args.keep_every,
-            args.num_simultaneous_tasks,
-            args.sleep_time_per_update,
+            keep_every=args.keep_every,
+            num_simultaneous_tasks=args.num_simultaneous_tasks,
+            sleep_time_per_update=args.sleep_time_per_update,
         )
     elif args.command == "monitor":
         monitor(
-            args.keep_every,
-            args.recheck_every_num_updates,
-            args.num_simultaneous_tasks,
-            args.sleep_time_per_update,
+            keep_every=args.keep_every,
+            num_simultaneous_tasks=args.num_simultaneous_tasks,
+            sleep_time_per_update=args.sleep_time_per_update,
+            recheck_every_num_updates=args.recheck_every_num_updates,
         )
 
 
