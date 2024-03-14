@@ -27,7 +27,10 @@ class SlurmJobManager:
             raise ValueError(
                 f"{self.case_dir} does not contain {self.job_sfile}"
             )
-        # TODO: Ensure that compress_sfile is present
+        if not (self.case_dir / self.compress_sfile).is_file():
+            raise ValueError(
+                f"{self.case_dir} does not contain {self.job_sfile}"
+            )
         # TODO: Ensure that the job ID is correct
 
     def _read_job_name(self) -> str:
