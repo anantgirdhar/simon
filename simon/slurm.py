@@ -41,12 +41,6 @@ class SlurmJobManager:
                     return m.group(1)
         raise Exception("Unable to find job name.")
 
-    def get_new_tasks(self) -> List[Task]:
-        raise NotImplementedError
-        new_tasks: List[Task] = []
-        # Get the current state of the files
-        return new_tasks
-
     def get_job_status(self, job_id: str) -> str:
         squeue_output = (
             subprocess.check_output(
