@@ -9,7 +9,10 @@ RECONSTRUCTION_DONE_MARKER_FILENAME = ".__reconstruction_done"
 
 class OFListener:
     def __init__(
-        self, keep_every: Decimal, case_dir: Path = Path(".")
+        self,
+        keep_every: Decimal,
+        compress_every: Decimal,
+        case_dir: Path,
     ) -> None:
         if not self._is_valid_openfoam_dir(case_dir):
             raise ValueError(
@@ -17,6 +20,7 @@ class OFListener:
             )
         self.case_dir = case_dir
         self.keep_every = keep_every
+        self.compress_every = compress_every
         self._processed_split_times: List[str] = []
         self._processed_reconstructed_times: List[str] = []
         self._processed_tarred_times: List[str] = []
@@ -38,14 +42,17 @@ class OFListener:
     def get_new_tasks(self) -> List[Task]:
         new_tasks: List[Task] = []
         # Get the current state of the files
-        new_split_times = self._get_new_split_times()
-        new_reconstructed_times = self._get_new_reconstructed_times()
-        new_tarred_times = self._get_new_tarred_times()
+        split_times = self._get_split_times()
+        reconstructed_times = self._get_reconstructed_times()
+        tarred_times = self._get_tarred_times()
+        # compressed_files = self._get_compressed_files()
         # Remove the last split time from consideration. This is because it is
         # possible that OpenFOAM is still writing out the last split time
         # files, in which case, it's not ready for further processing
         # (reconstruction) yet.
-        for t in new_split_times[:-1]:
+        for t in split_times[:-1]:
+            if t in self._processed_split_times:
+                continue
             if self._delete_without_processing(Decimal(t)):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
@@ -55,16 +62,20 @@ class OFListener:
             else:
                 new_tasks.append(self._create_reconstruct_task(t))
                 self._processed_split_times.append(t)
-        for t in new_reconstructed_times:
+        for t in reconstructed_times:
+            if t in self._processed_reconstructed_times:
+                continue
             if not self._was_successfully_tarred(t):
                 new_tasks.append(self._create_tar_task(t))
             # Delete it's split time if it is not the last split time
-            if new_split_times and t != new_split_times[-1]:
+            if split_times and t != split_times[-1]:
                 new_tasks.append(self._create_delete_split_task(t))
                 # Mark the time as completed if the split time is deleted
                 # because the tar task has already been dealt with
                 self._processed_reconstructed_times.append(t)
-        for t in new_tarred_times:
+        for t in tarred_times:
+            if t in self._processed_tarred_times:
+                continue
             new_tasks.append(self._create_delete_reconstructed_task(t))
             self._processed_tarred_times.append(t)
         return new_tasks
@@ -82,7 +93,7 @@ class OFListener:
         # reconstructPar still runs. This may not be desirable but hopefully
         # this is a rare occurance and so this solution should be good enough
         # Start with the most recent split time and work backwards from there
-        for t in reversed(self._get_new_split_times()):
+        for t in reversed(self._get_split_times()):
             task = self._create_reconstruct_task(t)
             task.run(block=True)
             if not task.was_successful():
@@ -93,7 +104,7 @@ class OFListener:
                 # Now try the next available split time
                 continue
         # Now remove any incompletely reconstructed times
-        for t in self._get_new_reconstructed_times():
+        for t in self._get_reconstructed_times():
             if not self._was_successfully_reconstructed(t):
                 new_tasks.append(self._create_delete_reconstructed_task(t))
         # We could remove any in progress tars, but these should theoreticaly
@@ -109,7 +120,7 @@ class OFListener:
             raise Exception("This is not a cleaned directory.")
         # Remove the processor directories if there are no split times
         # These should get recreated when the job is created
-        if not self._get_new_split_times():
+        if not self._get_split_times():
             print("No split times left. Deleting all processor directories...")
             Task(command=f"rm -rf {self.case_dir}/processor*").run(block=True)
         else:
@@ -119,14 +130,14 @@ class OFListener:
             return
         # Further, make sure that there is a reconstructed time that can be
         # decomposed to recreate the processor directories
-        reconstructed_times = self._get_new_reconstructed_times()
+        reconstructed_times = self._get_reconstructed_times()
         if reconstructed_times:
             print("Found some reconstructed times! Ready to proceed!")
             # We're done because this is a cleaned directory meaning that any
             # reconstructed times are complete and can be decomposed
             return
         # Otherwise, look for the last tarred time and try to decompose that
-        tarred_times = self._get_new_tarred_times()
+        tarred_times = self._get_tarred_times()
         if tarred_times:
             # Decompose the most recent tarred time and then we're done
             newest_tar_time = tarred_times[-1]
@@ -157,35 +168,33 @@ class OFListener:
         quotient = timestep / self.keep_every
         return quotient % 1 != 0
 
-    def _get_new_split_times(self) -> List[str]:
+    def _get_split_times(self) -> List[str]:
         processor0_directory = self.case_dir / "processor0"
         return sorted(
             [
                 t.name
                 for t in processor0_directory.glob("[0-9]*")
-                if t.is_dir() and t.name not in self._processed_split_times
+                if t.is_dir()
             ],
             key=float,
         )
 
-    def _get_new_reconstructed_times(self) -> List[str]:
+    def _get_reconstructed_times(self) -> List[str]:
         return sorted(
             [
                 t.name
                 for t in self.case_dir.glob("[0-9]*")
                 if t.is_dir()
                 and (t / RECONSTRUCTION_DONE_MARKER_FILENAME).is_file()
-                and t.name not in self._processed_reconstructed_times
             ],
             key=float,
         )
 
-    def _get_new_tarred_times(self) -> List[str]:
+    def _get_tarred_times(self) -> List[str]:
         return sorted(
             [
                 t.stem  # Remove the .tar file extension to get just the time
                 for t in self.case_dir.glob("[0-9]*.tar")
-                if t.stem not in self._processed_tarred_times
             ]
         )
 

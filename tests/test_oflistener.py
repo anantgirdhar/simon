@@ -1,4 +1,3 @@
-import os
 from decimal import Decimal
 from pathlib import Path
 from typing import List
@@ -94,13 +93,7 @@ def create_reconstructed_tars(case_dir: Path, timestamps: List[str]) -> None:
 
 def test_in_valid_provided_case_dir(decomposed_case_dir: Path) -> None:
     # This should not raise an error
-    OFListener(Decimal("0.0001"), decomposed_case_dir)
-
-
-def test_in_valid_default_case_dir(decomposed_case_dir: Path) -> None:
-    os.chdir(decomposed_case_dir)
-    # This should not raise an error either
-    OFListener(Decimal("0.0001"))
+    OFListener(Decimal("0.0001"), Decimal("0.01"), decomposed_case_dir)
 
 
 @pytest.mark.parametrize("leave_out_dir", ["constant", "system", "processor0"])
@@ -113,7 +106,7 @@ def test_in_bad_case_dir(tmp_path: Path, leave_out_dir: str) -> None:
             continue
         (case_dir / directory).mkdir()
     with pytest.raises(ValueError):
-        OFListener(Decimal("0.0001"), case_dir)
+        OFListener(Decimal("0.0001"), Decimal("0.01"), case_dir)
 
 
 # Test timestamp deletion check
@@ -124,7 +117,7 @@ def test_should_delete_smaller_timestamps(
     decomposed_case_dir: Path, keep_every: Decimal, timestamp: Decimal
 ) -> None:
     # Anything smaller than keep_every should be deleted
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     assert listener._delete_without_processing(timestamp) is True
 
 
@@ -132,7 +125,11 @@ def test_should_delete_smaller_timestamps(
 def test_should_not_delete_equal_timestamps(
     decomposed_case_dir: Path, timestamp: Decimal
 ) -> None:
-    listener = OFListener(keep_every=timestamp, case_dir=decomposed_case_dir)
+    listener = OFListener(
+        keep_every=timestamp,
+        compress_every=Decimal("0.01"),
+        case_dir=decomposed_case_dir,
+    )
     assert listener._delete_without_processing(timestamp) is False
 
 
@@ -168,7 +165,7 @@ def test_delete_larger_timestamps(
     timestamp: Decimal,
     result: bool,
 ) -> None:
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     assert listener._delete_without_processing(timestamp) is result
 
 
@@ -179,7 +176,9 @@ def test_delete_larger_timestamps(
 def test_reconstruct_task_command(
     decomposed_case_dir: Path, timestamp: str
 ) -> None:
-    listener = OFListener(Decimal("0.0001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.0001"), Decimal("0.01"), decomposed_case_dir
+    )
     reconstruction_done_marker_filepath = (
         decomposed_case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME
     )
@@ -192,7 +191,9 @@ def test_reconstruct_task_command(
 def test_delete_split_task_command(
     decomposed_case_dir: Path, timestamp: str
 ) -> None:
-    listener = OFListener(Decimal("0.0001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.0001"), Decimal("0.01"), decomposed_case_dir
+    )
     true_command = f"rm -rf {decomposed_case_dir}/processor*/{timestamp}"
     generated_command = listener._create_delete_split_task(timestamp).command
     assert generated_command == true_command
@@ -202,7 +203,9 @@ def test_delete_split_task_command(
 def test_delete_reconstructed_task_command(
     decomposed_case_dir: Path, timestamp: str
 ) -> None:
-    listener = OFListener(Decimal("0.0001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.0001"), Decimal("0.01"), decomposed_case_dir
+    )
     true_command = f"rm -rf {decomposed_case_dir}/{timestamp}"
     generated_command = listener._create_delete_reconstructed_task(
         timestamp
@@ -214,7 +217,9 @@ def test_delete_reconstructed_task_command(
 def test_create_tar_task_command(
     decomposed_case_dir: Path, timestamp: str
 ) -> None:
-    listener = OFListener(Decimal("0.0001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.0001"), Decimal("0.01"), decomposed_case_dir
+    )
     reconstruction_done_marker_filepath = (
         decomposed_case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME
     )
@@ -243,7 +248,7 @@ def test_does_reconstruct_new_times(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     for timestamp, action in zip(split_times, actions):
@@ -268,7 +273,7 @@ def test_does_not_reconstruct_last_time(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     unallowed_task = listener._create_reconstruct_task(split_times[-1])
@@ -290,7 +295,7 @@ def test_does_not_reconstruct_already_reconstructed_times(
     num_reconstructed_dirs: int,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     # Reconstruct as many directories as requested by the test
     already_reconstructed_times = split_times[:num_reconstructed_dirs]
@@ -313,7 +318,7 @@ def test_does_reconstruct_partially_reconstructed_times(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     # Partially reconstruct every timestamp
     create_reconstructed_timestamps_without_done_marker(
@@ -349,7 +354,7 @@ def test_does_not_reconstruct_tarred_times(
     num_tarred_times: int,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     # Tar as many directories as requested by the test
     already_tarred_times = split_times[:num_tarred_times]
@@ -373,7 +378,7 @@ def test_deletes_split_times_if_not_wanted(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     for timestamp, action in zip(split_times, actions):
@@ -396,7 +401,7 @@ def test_does_not_delete_last_split_time_when_it_is_not_reconstructed(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     unallowed_task = listener._create_delete_split_task(split_times[-1])
@@ -413,7 +418,7 @@ def test_does_not_delete_last_split_time_when_it_is_partially_reconstructed(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     last_split_time = split_times[-1]
     create_reconstructed_timestamps_without_done_marker(
@@ -434,7 +439,7 @@ def test_does_not_delete_last_split_time_when_it_is_fully_reconstructed(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     last_split_time = split_times[-1]
     create_reconstructed_timestamps_with_done_marker(
@@ -455,7 +460,7 @@ def test_does_not_delete_last_split_time_when_it_is_tarred(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     last_split_time = split_times[-1]
     create_reconstructed_tars(decomposed_case_dir, [last_split_time])
@@ -479,7 +484,7 @@ def test_deletes_split_times_if_reconstructed(
     num_reconstructed_dirs: int,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     # Reconstruct as many directories as requested by the test
     already_reconstructed_times = split_times[:num_reconstructed_dirs]
@@ -507,7 +512,7 @@ def test_deletes_split_times_if_tarred(
     num_tarred_times: int,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     # Tar as many directories as requested by the test
     already_tarred_times = split_times[:num_tarred_times]
@@ -528,7 +533,7 @@ def test_does_not_delete_split_time_if_not_reconstructed(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     for timestamp, action in zip(split_times, actions):
@@ -551,7 +556,7 @@ def test_does_not_delete_split_time_if_partially_reconstructed(
     actions: List[str],
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(keep_every, decomposed_case_dir)
+    listener = OFListener(keep_every, Decimal("0.01"), decomposed_case_dir)
     create_split_timestamps(decomposed_case_dir, split_times)
     # Partially reconstruct every timestamp
     create_reconstructed_timestamps_without_done_marker(
@@ -580,7 +585,9 @@ def test_deletes_reconstructed_times_if_tarred(
     num_tarred_times: int,
 ) -> None:
     # Setup the fake case with fake reconstructed data
-    listener = OFListener(Decimal("0.001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.001"), Decimal("0.01"), decomposed_case_dir
+    )
     create_reconstructed_timestamps_with_done_marker(
         decomposed_case_dir, TEST_TIMESTAMP_STRINGS
     )
@@ -602,7 +609,9 @@ def test_does_not_delete_reconstructed_times_if_not_tarred(
     num_tarred_times: int,
 ) -> None:
     # Setup the fake case with fake reconstructed data
-    listener = OFListener(Decimal("0.001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.001"), Decimal("0.01"), decomposed_case_dir
+    )
     create_reconstructed_timestamps_with_done_marker(
         decomposed_case_dir, TEST_TIMESTAMP_STRINGS
     )
@@ -627,7 +636,9 @@ def test_does_not_delete_partially_reconstructed_times(
     num_partially_reconstructed_times: int,
 ) -> None:
     # Setup the fake case with fake reconstructed data
-    listener = OFListener(Decimal("0.001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.001"), Decimal("0.01"), decomposed_case_dir
+    )
     # Partially reconstruct as many times as requested by the test
     partial_times = TEST_TIMESTAMP_STRINGS[:num_partially_reconstructed_times]
     create_reconstructed_timestamps_without_done_marker(
@@ -650,7 +661,9 @@ def test_tars_times_if_reconstructed(
     decomposed_case_dir: Path,
 ) -> None:
     # Setup the fake case with fake reconstructed data
-    listener = OFListener(Decimal("0.001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.001"), Decimal("0.01"), decomposed_case_dir
+    )
     create_reconstructed_timestamps_with_done_marker(
         decomposed_case_dir, TEST_TIMESTAMP_STRINGS
     )
@@ -669,7 +682,9 @@ def test_does_not_tar_time_if_partially_reconstructed(
     num_partially_reconstructed_times: int,
 ) -> None:
     # Setup the fake case with fake reconstructed data
-    listener = OFListener(Decimal("0.001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.001"), Decimal("0.01"), decomposed_case_dir
+    )
     # Partially reconstruct as many times as requested by the test
     partial_times = TEST_TIMESTAMP_STRINGS[:num_partially_reconstructed_times]
     create_reconstructed_timestamps_without_done_marker(
@@ -692,7 +707,9 @@ def test_does_not_tar_time_if_already_tarred(
     num_tarred_times: int,
 ) -> None:
     # Setup the fake case with fake reconstructed data
-    listener = OFListener(Decimal("0.001"), decomposed_case_dir)
+    listener = OFListener(
+        Decimal("0.001"), Decimal("0.01"), decomposed_case_dir
+    )
     create_reconstructed_timestamps_with_done_marker(
         decomposed_case_dir, TEST_TIMESTAMP_STRINGS
     )
