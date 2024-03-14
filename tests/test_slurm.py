@@ -6,7 +6,7 @@ from typing import List
 from unittest import mock
 
 import pytest
-from simon.slurm import SlurmJobManager
+from simon.cluster.slurm import SlurmJobManager
 from simon.task import Task
 
 JOB_SFILE_NAME = "case.sbatch"
