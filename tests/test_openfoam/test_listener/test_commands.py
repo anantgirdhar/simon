@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from simon.openfoam.file_state import RECONSTRUCTION_DONE_MARKER_FILENAME
 from simon.openfoam.listener import OFListener
-from tests.test_oflistener.conftest import TEST_TIMESTAMP_STRINGS
+from tests.test_openfoam.conftest import TEST_TIMESTAMP_STRINGS
 
 
 @pytest.mark.parametrize("timestamp", TEST_TIMESTAMP_STRINGS)

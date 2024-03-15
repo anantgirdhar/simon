@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from simon.openfoam.listener import OFListener
-from tests.test_oflistener.conftest import (
+from tests.test_openfoam.conftest import (
     TEST_TIMESTAMP_STRINGS, create_reconstructed_tars,
     create_reconstructed_timestamps_with_done_marker,
     create_reconstructed_timestamps_without_done_marker)

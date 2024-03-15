@@ -4,13 +4,13 @@ from typing import List
 
 import pytest
 from simon.openfoam.listener import OFListener
-from tests.test_oflistener._oflistener_test_cases import \
-    OFLISTENER_TEST_CASES_SPLIT_ONLY
-from tests.test_oflistener.conftest import (
+from tests.test_openfoam.conftest import (
     create_reconstructed_tars,
     create_reconstructed_timestamps_with_done_marker,
     create_reconstructed_timestamps_without_done_marker,
     create_split_timestamps)
+from tests.test_openfoam.test_listener._oflistener_test_cases import \
+    OFLISTENER_TEST_CASES_SPLIT_ONLY
 
 # Ensure that it is not reconstructing when it shouldn't
 
