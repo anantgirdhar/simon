@@ -13,11 +13,13 @@ from tests.test_oflistener.conftest import (
     create_reconstructed_timestamps_without_done_marker,
     create_split_timestamps)
 
+# Ensure that the last split time does not get deleted ever
+
 
 @pytest.mark.parametrize(
     "keep_every, split_times, actions", OFLISTENER_TEST_CASES_SPLIT_ONLY
 )
-def test_deletes_split_times_if_not_wanted(
+def test_does_not_delete_last_split_time_even_if_not_divisible_by_keep_every(
     decomposed_case_dir: Path,
     keep_every: Decimal,
     split_times: List[str],
@@ -33,14 +35,9 @@ def test_deletes_split_times_if_not_wanted(
     )
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
-    for timestamp, action in zip(split_times, actions):
-        if timestamp == split_times[-1]:
-            # Don't delete the last timestamp because we don't know if it
-            # has been written out completely
-            continue
-        if action == "delete":
-            required_task = listener._create_delete_split_task(timestamp)
-            assert required_task in tasks
+    timestamp = split_times[-1]
+    forbidden_task = listener._create_delete_split_task(timestamp)
+    assert forbidden_task not in tasks
 
 
 @pytest.mark.parametrize(
@@ -145,6 +142,103 @@ def test_does_not_delete_last_split_time_when_it_is_tarred(
     assert unallowed_task not in tasks
 
 
+# Ensure that the split times that should not be deleted are not deleted
+
+
+@pytest.mark.parametrize(
+    "keep_every, split_times, actions", OFLISTENER_TEST_CASES_SPLIT_ONLY
+)
+def test_does_not_delete_split_time_if_wanted_but_not_reconstructed(
+    decomposed_case_dir: Path,
+    keep_every: Decimal,
+    split_times: List[str],
+    actions: List[str],
+    cluster: Mock,
+) -> None:
+    # Setup the fake case with fake split data
+    listener = OFListener(
+        keep_every=keep_every,
+        compress_every=Decimal("0.01"),
+        cluster=cluster,
+        case_dir=decomposed_case_dir,
+    )
+    create_split_timestamps(decomposed_case_dir, split_times)
+    tasks = listener.get_new_tasks()
+    for timestamp, action in zip(split_times, actions):
+        if timestamp == split_times[-1]:
+            # Don't delete the last timestamp because we don't know if it
+            # has been written out completely
+            continue
+        if action == "reconstruct":
+            unallowed_task = listener._create_delete_split_task(timestamp)
+            assert unallowed_task not in tasks
+
+
+@pytest.mark.parametrize(
+    "keep_every, split_times, actions", OFLISTENER_TEST_CASES_SPLIT_ONLY
+)
+def test_does_not_delete_split_time_if_partially_reconstructed(
+    decomposed_case_dir: Path,
+    keep_every: Decimal,
+    split_times: List[str],
+    actions: List[str],
+    cluster: Mock,
+) -> None:
+    # Setup the fake case with fake split data
+    listener = OFListener(
+        keep_every=keep_every,
+        compress_every=Decimal("0.01"),
+        cluster=cluster,
+        case_dir=decomposed_case_dir,
+    )
+    create_split_timestamps(decomposed_case_dir, split_times)
+    # Partially reconstruct every timestamp
+    create_reconstructed_timestamps_without_done_marker(
+        decomposed_case_dir, split_times
+    )
+    tasks = listener.get_new_tasks()
+    for timestamp, action in zip(split_times, actions):
+        if timestamp == split_times[-1]:
+            # Don't delete the last timestamp because we don't know if it
+            # has been written out completely
+            continue
+        if action == "reconstruct":
+            unallowed_task = listener._create_delete_split_task(timestamp)
+            assert unallowed_task not in tasks
+
+
+# Ensure that the split times that need to be deleted are getting deleted
+
+
+@pytest.mark.parametrize(
+    "keep_every, split_times, actions", OFLISTENER_TEST_CASES_SPLIT_ONLY
+)
+def test_deletes_split_times_not_divisible_by_keep_every(
+    decomposed_case_dir: Path,
+    keep_every: Decimal,
+    split_times: List[str],
+    actions: List[str],
+    cluster: Mock,
+) -> None:
+    # Setup the fake case with fake split data
+    listener = OFListener(
+        keep_every=keep_every,
+        compress_every=Decimal("0.01"),
+        cluster=cluster,
+        case_dir=decomposed_case_dir,
+    )
+    create_split_timestamps(decomposed_case_dir, split_times)
+    tasks = listener.get_new_tasks()
+    for timestamp, action in zip(split_times, actions):
+        if timestamp == split_times[-1]:
+            # Don't delete the last timestamp because we don't know if it
+            # has been written out completely
+            continue
+        if action == "delete":
+            required_task = listener._create_delete_split_task(timestamp)
+            assert required_task in tasks
+
+
 @pytest.mark.parametrize(
     "num_reconstructed_dirs",
     range(1, len(OFLISTENER_TEST_CASES_SPLIT_ONLY[0][1])),
@@ -209,65 +303,3 @@ def test_deletes_split_times_if_tarred(
     for timestamp in already_tarred_times:
         required_task = listener._create_delete_split_task(timestamp)
         assert required_task in tasks
-
-
-@pytest.mark.parametrize(
-    "keep_every, split_times, actions", OFLISTENER_TEST_CASES_SPLIT_ONLY
-)
-def test_does_not_delete_split_time_if_not_reconstructed(
-    decomposed_case_dir: Path,
-    keep_every: Decimal,
-    split_times: List[str],
-    actions: List[str],
-    cluster: Mock,
-) -> None:
-    # Setup the fake case with fake split data
-    listener = OFListener(
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-        case_dir=decomposed_case_dir,
-    )
-    create_split_timestamps(decomposed_case_dir, split_times)
-    tasks = listener.get_new_tasks()
-    for timestamp, action in zip(split_times, actions):
-        if timestamp == split_times[-1]:
-            # Don't delete the last timestamp because we don't know if it
-            # has been written out completely
-            continue
-        if action == "reconstruct":
-            unallowed_task = listener._create_delete_split_task(timestamp)
-            assert unallowed_task not in tasks
-
-
-@pytest.mark.parametrize(
-    "keep_every, split_times, actions", OFLISTENER_TEST_CASES_SPLIT_ONLY
-)
-def test_does_not_delete_split_time_if_partially_reconstructed(
-    decomposed_case_dir: Path,
-    keep_every: Decimal,
-    split_times: List[str],
-    actions: List[str],
-    cluster: Mock,
-) -> None:
-    # Setup the fake case with fake split data
-    listener = OFListener(
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-        case_dir=decomposed_case_dir,
-    )
-    create_split_timestamps(decomposed_case_dir, split_times)
-    # Partially reconstruct every timestamp
-    create_reconstructed_timestamps_without_done_marker(
-        decomposed_case_dir, split_times
-    )
-    tasks = listener.get_new_tasks()
-    for timestamp, action in zip(split_times, actions):
-        if timestamp == split_times[-1]:
-            # Don't delete the last timestamp because we don't know if it
-            # has been written out completely
-            continue
-        if action == "reconstruct":
-            unallowed_task = listener._create_delete_split_task(timestamp)
-            assert unallowed_task not in tasks

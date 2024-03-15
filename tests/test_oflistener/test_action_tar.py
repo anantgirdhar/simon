@@ -10,26 +10,6 @@ from tests.test_oflistener.conftest import (
     create_reconstructed_timestamps_without_done_marker)
 
 
-def test_tars_times_if_reconstructed(
-    decomposed_case_dir: Path,
-    cluster: Mock,
-) -> None:
-    # Setup the fake case with fake reconstructed data
-    listener = OFListener(
-        keep_every=Decimal("0.001"),
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-        case_dir=decomposed_case_dir,
-    )
-    create_reconstructed_timestamps_with_done_marker(
-        decomposed_case_dir, TEST_TIMESTAMP_STRINGS
-    )
-    tasks = listener.get_new_tasks()
-    for timestamp in TEST_TIMESTAMP_STRINGS:
-        required_task = listener._create_tar_task(timestamp)
-        assert required_task in tasks
-
-
 @pytest.mark.parametrize(
     "num_partially_reconstructed_times",
     range(1, len(TEST_TIMESTAMP_STRINGS)),
@@ -87,3 +67,23 @@ def test_does_not_tar_time_if_already_tarred(
             # If a time is tarred, it should not be tarred again
             unallowed_task = listener._create_tar_task(timestamp)
             assert unallowed_task not in tasks
+
+
+def test_tars_times_if_reconstructed(
+    decomposed_case_dir: Path,
+    cluster: Mock,
+) -> None:
+    # Setup the fake case with fake reconstructed data
+    listener = OFListener(
+        keep_every=Decimal("0.001"),
+        compress_every=Decimal("0.01"),
+        cluster=cluster,
+        case_dir=decomposed_case_dir,
+    )
+    create_reconstructed_timestamps_with_done_marker(
+        decomposed_case_dir, TEST_TIMESTAMP_STRINGS
+    )
+    tasks = listener.get_new_tasks()
+    for timestamp in TEST_TIMESTAMP_STRINGS:
+        required_task = listener._create_tar_task(timestamp)
+        assert required_task in tasks

@@ -29,21 +29,6 @@ TEST_TIMESTAMP_DECIMALS = list(
 )
 
 
-# Fixtures to create some timestamps
-
-
-def pytest_generate_tests(metafunc) -> None:  # type: ignore
-    if metafunc.function.__name__ == "test_should_delete_smaller_timestamps":
-        # Create tests where the timestamp being tested is smaller than
-        # keep_every to check if each of them is being deleted
-        test_data = []
-        for t in TEST_TIMESTAMP_DECIMALS:
-            for smaller_t in TEST_TIMESTAMP_DECIMALS:
-                if smaller_t < t:
-                    test_data.append((t, smaller_t))
-        metafunc.parametrize("keep_every, timestamp", test_data)
-
-
 # Case directory setup convenience functions
 
 
