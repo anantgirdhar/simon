@@ -106,14 +106,9 @@ def test_can_extract_job_name(cluster: SlurmJobManager) -> None:
 # Mock Task so that it does not run anything
 
 
-def print_instead_of_running(task: Task, block: bool = False) -> None:
-    print(f"Command: {task.command}", end="")
-
-
 @pytest.fixture
 def mocked_task_run():
     with mock.patch.object(Task, "run", autospec=True) as _mocked_task_run:
-        _mocked_task_run.side_effect = print_instead_of_running
         yield _mocked_task_run
 
 
@@ -144,56 +139,70 @@ def mocked_get_job_status_does_not_exist():
         yield _mocked_get_job_id
 
 
-def assert_task_did_not_run(capfd) -> None:
-    out, err = capfd.readouterr()
-    assert out == ""
+@pytest.fixture
+def mocked_get_dependent_jobs_queued():
+    with mock.patch.object(
+        SlurmJobManager, "_get_dependent_jobs", autospec=True
+    ) as _mocked_get_dependent_jobs:
+        _mocked_get_dependent_jobs.return_value = ["123456789"]
+        yield _mocked_get_dependent_jobs
 
 
-def assert_task_ran(capfd) -> None:
-    out, err = capfd.readouterr()
-    assert out.startswith("Command: ")
+@pytest.fixture
+def mocked_get_dependent_jobs_none():
+    with mock.patch.object(
+        SlurmJobManager, "_get_dependent_jobs", autospec=True
+    ) as _mocked_get_dependent_jobs:
+        _mocked_get_dependent_jobs.return_value = []
+        yield _mocked_get_dependent_jobs
 
 
 # Test requeueing
 
 
 def test_requeue_generates_correct_command(
-    cluster: SlurmJobManager, mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    mocked_task_run,
+    mocked_get_dependent_jobs_none,
 ) -> None:
     cluster.requeue_job()
-    out, err = capfd.readouterr()
+    mocked_task_run.assert_called_once()
+    args = mocked_task_run.mock_calls[0].args
+    assert len(args) == 1
+    assert isinstance(args[0], Task)
+    generated_command = args[0].command
+    assert mocked_task_run.mock_calls[0].kwargs == {"block": True}
     cwd = os.getcwd()
-    assert (
-        out == f"Command: cd {cluster.case_dir}"
+    true_command = (
+        f"cd {cluster.case_dir}"
         f" && sbatch --parsable -d afterany:{SLURM_JOB_ID} {JOB_SFILE_NAME}"
         f" && cd {cwd}"
     )
+    assert generated_command == true_command
 
 
 def test_requeue_does_not_run_twice(
-    cluster: SlurmJobManager, mocked_task_run, capfd
+    cluster: SlurmJobManager, mocked_task_run, mocked_get_dependent_jobs_queued
 ) -> None:
-    # Requeue the job and read the buffer
+    # With the mocked get dependent jobs, it should not requeue the job
     cluster.requeue_job()
-    _, _ = capfd.readouterr()
-    # Try to requeue again and read the buffer
-    cluster.requeue_job()
-    out, err = capfd.readouterr()
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_requeue_handles_missing_sfile(
-    cluster: SlurmJobManager, mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    mocked_task_run,
 ) -> None:
     # Remove the sfile
     (cluster.case_dir / cluster.job_sfile).unlink()
     with pytest.raises(FileNotFoundError):
         cluster.requeue_job()
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_requeue_handles_changed_job_name(
-    cluster: SlurmJobManager, mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    mocked_task_run,
 ) -> None:
     # Instead of changing the job name in the sfile, change it in the
     # SlurmJobManager instance so that it no longer matches the sfile to
@@ -201,38 +210,45 @@ def test_requeue_handles_changed_job_name(
     cluster.job_name = "very_random_new_job_name"
     with pytest.raises(AttributeError):
         cluster.requeue_job()
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 # Test compressing
 
 
 def test_compress_handles_empty_tgz_file_name(
-    cluster: SlurmJobManager, files_list: List[str], mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    files_list: List[str],
+    mocked_task_run,
 ) -> None:
     with pytest.raises(ValueError):
         cluster.compress(tgz_file="", files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_handles_tgz_file_name_with_spaces(
-    cluster: SlurmJobManager, files_list: List[str], mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    files_list: List[str],
+    mocked_task_run,
 ) -> None:
     with pytest.raises(ValueError):
         cluster.compress(tgz_file="some tgz file.tgz", files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_handles_empty_files_list(
-    cluster: SlurmJobManager, files_list: List[str], mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    files_list: List[str],
+    mocked_task_run,
 ) -> None:
     with pytest.raises(ValueError):
         cluster.compress(tgz_file="some_tgz_file.tgz", files=[])
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_handles_files_with_spaces_in_name(
-    cluster: SlurmJobManager, mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    mocked_task_run,
 ) -> None:
     files_list = ["file1", "file_2", "file 3", "file_4", "file5"]
     # Create these files
@@ -240,27 +256,31 @@ def test_compress_handles_files_with_spaces_in_name(
         (cluster.case_dir / f).touch()
     with pytest.raises(ValueError):
         cluster.compress(tgz_file="some_tgz_file.tgz", files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_handles_non_existent_files(
-    cluster: SlurmJobManager, files_list: List[str], mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    files_list: List[str],
+    mocked_task_run,
 ) -> None:
     # Remove one of the files
     (cluster.case_dir / files_list[2]).unlink()
     with pytest.raises(FileNotFoundError):
         cluster.compress(tgz_file="some_tgz_file.tgz", files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_handles_missing_sfile(
-    cluster: SlurmJobManager, files_list: List[str], mocked_task_run, capfd
+    cluster: SlurmJobManager,
+    files_list: List[str],
+    mocked_task_run,
 ) -> None:
     # Remove the sfile
     (cluster.case_dir / cluster.compress_sfile).unlink()
     with pytest.raises(FileNotFoundError):
         cluster.compress(tgz_file="some_tgz_file.tgz", files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_generates_correct_command_for_files(
@@ -336,7 +356,6 @@ def test_compress_does_not_run_when_queued(
     files_list: List[str],
     mocked_task_run,
     mocked_get_job_status_pending,
-    capfd,
 ) -> None:
     tgz_file = "test_tgz_file.tgz"
     # Simulate that the compression task is queued by creating the queued file
@@ -344,7 +363,7 @@ def test_compress_does_not_run_when_queued(
     queued_file_placeholder = tgz_file + ".queued"
     (cluster.case_dir / queued_file_placeholder).touch()
     cluster.compress(tgz_file=tgz_file, files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_does_not_run_when_inprogress(
@@ -352,7 +371,6 @@ def test_compress_does_not_run_when_inprogress(
     files_list: List[str],
     mocked_task_run,
     mocked_get_job_status_pending,
-    capfd,
 ) -> None:
     tgz_file = "test_tgz_file.tgz"
     # Simulate that the compression task is in progress by creating the in
@@ -360,7 +378,7 @@ def test_compress_does_not_run_when_inprogress(
     inprogress_file = tgz_file + f".inprogress.{COMPRESS_JOB_ID}"
     (cluster.case_dir / inprogress_file).touch()
     cluster.compress(tgz_file=tgz_file, files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_does_not_run_when_completed(
@@ -368,13 +386,12 @@ def test_compress_does_not_run_when_completed(
     files_list: List[str],
     mocked_task_run,
     mocked_get_job_status_pending,
-    capfd,
 ) -> None:
     tgz_file = "test_tgz_file.tgz"
     # Simulate that the compression task is complete by creating the tgz_file
     (cluster.case_dir / tgz_file).touch()
     cluster.compress(tgz_file=tgz_file, files=files_list)
-    assert_task_did_not_run(capfd)
+    mocked_task_run.assert_not_called()
 
 
 def test_compress_does_run_when_not_started(
@@ -382,13 +399,17 @@ def test_compress_does_run_when_not_started(
     files_list: List[str],
     mocked_task_run,
     mocked_get_job_status_pending,
-    capfd,
 ) -> None:
     tgz_file = "test_tgz_file.tgz"
     cluster.compress(tgz_file=tgz_file, files=files_list)
+    mocked_task_run.assert_called_once()
+    args = mocked_task_run.mock_calls[0].args
+    assert len(args) == 1
+    assert isinstance(args[0], Task)
+    generated_command = args[0].command
+    assert mocked_task_run.mock_calls[0].kwargs == {"block": True}
     true_command = (
-        f"Command: touch {cluster.case_dir}/{tgz_file}.queued"
+        f"touch {cluster.case_dir}/{tgz_file}.queued"
         + f" && sbatch {cluster.case_dir}/{COMPRESS_SFILE_NAME}.filled"
     )
-    out, err = capfd.readouterr()
-    assert out == true_command
+    assert generated_command == true_command
