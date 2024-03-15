@@ -1,10 +1,8 @@
 from decimal import Decimal
 from pathlib import Path
 from typing import List
-from unittest.mock import Mock
 
 import pytest
-from simon.openfoam.file_state import OFFileState
 from simon.openfoam.listener import OFListener
 from tests.test_oflistener._oflistener_test_cases import \
     OFLISTENER_TEST_CASES_SPLIT_ONLY
@@ -25,15 +23,10 @@ def test_does_not_reconstruct_last_time(
     keep_every: Decimal,
     split_times: List[str],
     actions: List[str],
-    cluster: Mock,
+    listener: OFListener,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(
-        state=OFFileState(decomposed_case_dir),
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-    )
+    listener.keep_every = keep_every
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     unallowed_task = listener._create_reconstruct_task(split_times[-1])
@@ -53,15 +46,10 @@ def test_does_not_reconstruct_already_reconstructed_times(
     split_times: List[str],
     actions: List[str],
     num_reconstructed_dirs: int,
-    cluster: Mock,
+    listener: OFListener,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(
-        state=OFFileState(decomposed_case_dir),
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-    )
+    listener.keep_every = keep_every
     create_split_timestamps(decomposed_case_dir, split_times)
     # Reconstruct as many directories as requested by the test
     already_reconstructed_times = split_times[:num_reconstructed_dirs]
@@ -87,15 +75,10 @@ def test_does_not_reconstruct_tarred_times(
     split_times: List[str],
     actions: List[str],
     num_tarred_times: int,
-    cluster: Mock,
+    listener: OFListener,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(
-        state=OFFileState(decomposed_case_dir),
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-    )
+    listener.keep_every = keep_every
     create_split_timestamps(decomposed_case_dir, split_times)
     # Tar as many directories as requested by the test
     already_tarred_times = split_times[:num_tarred_times]
@@ -117,15 +100,10 @@ def test_does_reconstruct_new_times(
     keep_every: Decimal,
     split_times: List[str],
     actions: List[str],
-    cluster: Mock,
+    listener: OFListener,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(
-        state=OFFileState(decomposed_case_dir),
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-    )
+    listener.keep_every = keep_every
     create_split_timestamps(decomposed_case_dir, split_times)
     tasks = listener.get_new_tasks()
     for timestamp, action in zip(split_times, actions):
@@ -148,15 +126,10 @@ def test_does_reconstruct_partially_reconstructed_times(
     keep_every: Decimal,
     split_times: List[str],
     actions: List[str],
-    cluster: Mock,
+    listener: OFListener,
 ) -> None:
     # Setup the fake case with fake split data
-    listener = OFListener(
-        state=OFFileState(decomposed_case_dir),
-        keep_every=keep_every,
-        compress_every=Decimal("0.01"),
-        cluster=cluster,
-    )
+    listener.keep_every = keep_every
     create_split_timestamps(decomposed_case_dir, split_times)
     # Partially reconstruct every timestamp
     create_reconstructed_timestamps_without_done_marker(

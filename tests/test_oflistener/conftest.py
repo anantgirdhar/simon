@@ -4,7 +4,9 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
-from simon.openfoam.file_state import RECONSTRUCTION_DONE_MARKER_FILENAME
+from simon.openfoam.file_state import (RECONSTRUCTION_DONE_MARKER_FILENAME,
+                                       OFFileState)
+from simon.openfoam.listener import OFListener
 
 TEST_VARIABLES = ["U", "T", "p", "H2"]
 
@@ -73,5 +75,10 @@ def decomposed_case_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def cluster() -> Mock:
-    return Mock(spec=["requeue_job", "compress"])
+def listener(decomposed_case_dir: Path) -> OFListener:
+    return OFListener(
+        state=OFFileState(decomposed_case_dir),
+        keep_every=Decimal("0.0001"),
+        compress_every=Decimal("0.01"),
+        cluster=Mock(spec=["requeue_job", "compress"]),
+    )
