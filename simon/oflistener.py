@@ -1,17 +1,27 @@
 from decimal import Decimal
 from pathlib import Path
-from typing import List
+from typing import List, Protocol
 
 from simon.task import Task
 
 RECONSTRUCTION_DONE_MARKER_FILENAME = ".__reconstruction_done"
 
 
+class ExternalJobManager(Protocol):
+    def requeue_job(self) -> None:
+        ...
+
+    def compress(self, tgz_file: str, files: List[str]) -> None:
+        ...
+
+
 class OFListener:
     def __init__(
         self,
+        *,
         keep_every: Decimal,
         compress_every: Decimal,
+        cluster: ExternalJobManager,
         case_dir: Path,
     ) -> None:
         if not self._is_valid_openfoam_dir(case_dir):
@@ -21,6 +31,7 @@ class OFListener:
         self.case_dir = case_dir
         self.keep_every = keep_every
         self.compress_every = compress_every
+        self.cluster = cluster
         self._processed_split_times: List[str] = []
         self._processed_reconstructed_times: List[str] = []
         self._processed_tarred_times: List[str] = []
