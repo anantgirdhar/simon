@@ -62,6 +62,21 @@ class SlurmJobManager:
         # Otherwise the status is the third element
         return squeue_output[1].split(" ")[2]
 
+    def _get_dependent_jobs(self, job_id: str) -> List[str]:
+        dependent_jobs: List[str] = []
+        squeue_output = (
+            subprocess.check_output(f"squeue --me -o '%A %E'")
+            .decode("utf-8")
+            .split("\n")
+        )
+        dependency_regex = re.compile(r"([0-9]+)\s+[0-9a-zA-Z:]*{job_id}")
+        for line in squeue_output:
+            if line == "":
+                continue
+            if match := dependency_regex.match(line):
+                dependent_jobs.append(match.group(1))
+        return dependent_jobs
+
     def get_job_name(self, job_id: str) -> str:
         squeue_output = (
             subprocess.check_output(
@@ -91,6 +106,9 @@ class SlurmJobManager:
                 f"The job name in the sfile {new_job_name} does not match"
                 f" what this was started with {self.job_name}"
             )
+        if self._get_dependent_jobs(self.job_id):
+            # There is at least one job queued dependent on this one
+            return
         cwd = os.getcwd()
         commands = [
             f"cd {self.case_dir}",
@@ -129,6 +147,41 @@ class SlurmJobManager:
         # Now clean up the file
         filled_compress_sfile_path.unlink()
 
+    def __verify_compress_inputs(
+        self, tgz_file: str, files: List[str]
+    ) -> bool:
+        if not tgz_file:
+            raise ValueError("No output tgz_file specified")
+        if " " in tgz_file:
+            raise ValueError(f"No spaces allowed in file names ({tgz_file})")
+        if not files:
+            raise ValueError("No files to compress")
+        for f in files:
+            if " " in f:
+                raise ValueError(f"No spaces allowed in file names ({f})")
+            if not (self.case_dir / f).is_file():
+                raise FileNotFoundError(f"File {f} not found")
+        if not (self.case_dir / self.compress_sfile).is_file():
+            raise FileNotFoundError(
+                f"sfile {self.compress_sfile} does not exist"
+            )
+        return True
+
+    def __compress_is_running(self, tgz_file: str) -> bool:
+        tgz_path = self.case_dir / tgz_file
+        queued_file = tgz_path.with_name(tgz_file + ".queued")
+        if queued_file.is_file():
+            return True
+        inprogress_glob = self.case_dir.glob(f"{tgz_file}.inprogress.*")
+        for match in inprogress_glob:
+            inprogress_file = match.name
+            inprogress_job_id = inprogress_file.split(".")[-1]
+            status = self.get_job_status(inprogress_job_id)
+            if status != "JOB_NOT_FOUND":
+                # The job exists in slurm
+                return True
+        return False
+
     def compress(self, tgz_file: str, files: List[str]) -> None:
         # Compress some files to out_file then delete the files that were
         # compressed
@@ -151,48 +204,23 @@ class SlurmJobManager:
         # robustness against changing job names for the main task since the
         # state of the job is tied to the tgz_file requested (which hopefully
         # will be unique).
-        # First make sure the inputs are good
-        if not tgz_file:
-            raise ValueError("No output tgz_file specified")
-        if " " in tgz_file:
-            raise ValueError(f"No spaces allowed in file names ({tgz_file})")
-        if not files:
-            raise ValueError("No files to compress")
-        for f in files:
-            if " " in f:
-                raise ValueError(f"No spaces allowed in file names ({f})")
-            if not (self.case_dir / f).is_file():
-                raise FileNotFoundError(f"File {f} not found")
-        if not (self.case_dir / self.compress_sfile).is_file():
-            raise FileNotFoundError(
-                f"sfile {self.compress_sfile} does not exist"
-            )
+        self.__verify_compress_inputs(tgz_file, files)
         tgz_path = self.case_dir / tgz_file
-        # Next make sure that we haven't already run it
-        queued_file = tgz_path.with_name(tgz_file + ".queued")
-        if queued_file.is_file():
-            return
-        inprogress_glob = self.case_dir.glob(f"{tgz_file}.inprogress.*")
-        for match in inprogress_glob:
-            inprogress_file = match.name
-            inprogress_job_id = inprogress_file.split(".")[-1]
-            status = self.get_job_status(inprogress_job_id)
-            if status != "JOB_NOT_FOUND":
-                # The job exists in slurm
-                return
         if tgz_path.is_file():
             # The tar file already exists
             # Nothing to do here
             return
-        # inprogress_glob = self.case_dir.glob(f"{tgz_file}.inprogress.*")
-        # # Check if any of the state files exist for this tar
-        # Finally, we can run the compress command
+        if self.__compress_is_running(tgz_file):
+            return
         with self._create_compress_sfile(
             self._create_compress_command(tgz_file, files)
         ) as filled_compress_sfile:
+            cwd = os.getcwd()
             commands = [
+                f"cd {self.case_dir}",
                 f"touch {tgz_path}.queued",
                 f"sbatch {filled_compress_sfile}",
+                f"cd {cwd}",
             ]
             Task(command=" && ".join(commands), priority=0).run(block=True)
         # TODO: As a possible improvement, rename the queued file so that it
