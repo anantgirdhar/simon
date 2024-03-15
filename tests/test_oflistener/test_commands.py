@@ -3,19 +3,23 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from simon.oflistener import RECONSTRUCTION_DONE_MARKER_FILENAME, OFListener
+from simon.openfoam.file_state import (RECONSTRUCTION_DONE_MARKER_FILENAME,
+                                       OFFileState)
+from simon.openfoam.listener import OFListener
 from tests.test_oflistener.conftest import TEST_TIMESTAMP_STRINGS
 
 
 @pytest.mark.parametrize("timestamp", TEST_TIMESTAMP_STRINGS)
 def test_reconstruct_task_command(
-    decomposed_case_dir: Path, timestamp: str, cluster: Mock
+    decomposed_case_dir: Path,
+    timestamp: str,
+    cluster: Mock,
 ) -> None:
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.0001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     reconstruction_done_marker_filepath = (
         decomposed_case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME
@@ -30,13 +34,15 @@ def test_reconstruct_task_command(
 
 @pytest.mark.parametrize("timestamp", TEST_TIMESTAMP_STRINGS)
 def test_delete_split_task_command(
-    decomposed_case_dir: Path, timestamp: str, cluster: Mock
+    decomposed_case_dir: Path,
+    timestamp: str,
+    cluster: Mock,
 ) -> None:
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.0001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     true_command = f"rm -rf {decomposed_case_dir}/processor*/{timestamp}"
     generated_command = listener._create_delete_split_task(timestamp).command
@@ -45,13 +51,15 @@ def test_delete_split_task_command(
 
 @pytest.mark.parametrize("timestamp", TEST_TIMESTAMP_STRINGS)
 def test_delete_reconstructed_task_command(
-    decomposed_case_dir: Path, timestamp: str, cluster: Mock
+    decomposed_case_dir: Path,
+    timestamp: str,
+    cluster: Mock,
 ) -> None:
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.0001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     true_command = f"rm -rf {decomposed_case_dir}/{timestamp}"
     generated_command = listener._create_delete_reconstructed_task(
@@ -62,13 +70,15 @@ def test_delete_reconstructed_task_command(
 
 @pytest.mark.parametrize("timestamp", TEST_TIMESTAMP_STRINGS)
 def test_create_tar_task_command(
-    decomposed_case_dir: Path, timestamp: str, cluster: Mock
+    decomposed_case_dir: Path,
+    timestamp: str,
+    cluster: Mock,
 ) -> None:
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.0001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     reconstruction_done_marker_filepath = (
         decomposed_case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME

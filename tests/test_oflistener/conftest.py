@@ -4,7 +4,7 @@ from typing import List
 from unittest.mock import Mock
 
 import pytest
-from simon.oflistener import RECONSTRUCTION_DONE_MARKER_FILENAME
+from simon.openfoam.file_state import RECONSTRUCTION_DONE_MARKER_FILENAME
 
 TEST_VARIABLES = ["U", "T", "p", "H2"]
 

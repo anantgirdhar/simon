@@ -3,7 +3,8 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from simon.oflistener import OFListener
+from simon.openfoam.file_state import OFFileState
+from simon.openfoam.listener import OFListener
 from tests.test_oflistener.conftest import (
     TEST_TIMESTAMP_STRINGS, create_reconstructed_tars,
     create_reconstructed_timestamps_with_done_marker,
@@ -21,10 +22,10 @@ def test_does_not_delete_reconstructed_times_if_not_tarred(
 ) -> None:
     # Setup the fake case with fake reconstructed data
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     create_reconstructed_timestamps_with_done_marker(
         decomposed_case_dir, TEST_TIMESTAMP_STRINGS
@@ -52,10 +53,10 @@ def test_does_not_delete_partially_reconstructed_times(
 ) -> None:
     # Setup the fake case with fake reconstructed data
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     # Partially reconstruct as many times as requested by the test
     partial_times = TEST_TIMESTAMP_STRINGS[:num_partially_reconstructed_times]
@@ -83,10 +84,10 @@ def test_deletes_reconstructed_times_if_tarred(
 ) -> None:
     # Setup the fake case with fake reconstructed data
     listener = OFListener(
+        state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.001"),
         compress_every=Decimal("0.01"),
         cluster=cluster,
-        case_dir=decomposed_case_dir,
     )
     create_reconstructed_timestamps_with_done_marker(
         decomposed_case_dir, TEST_TIMESTAMP_STRINGS

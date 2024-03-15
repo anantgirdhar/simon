@@ -2,9 +2,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import List, Protocol
 
+from simon.openfoam.file_state import (RECONSTRUCTION_DONE_MARKER_FILENAME,
+                                       OFFileState)
 from simon.task import Task
-
-RECONSTRUCTION_DONE_MARKER_FILENAME = ".__reconstruction_done"
 
 
 class ExternalJobManager(Protocol):
@@ -19,16 +19,12 @@ class OFListener:
     def __init__(
         self,
         *,
+        state: OFFileState,
         keep_every: Decimal,
         compress_every: Decimal,
         cluster: ExternalJobManager,
-        case_dir: Path,
     ) -> None:
-        if not self._is_valid_openfoam_dir(case_dir):
-            raise ValueError(
-                "This does not appear to be a valid OpenFOAM root case dir."
-            )
-        self.case_dir = case_dir
+        self.state = state
         self.keep_every = keep_every
         self.compress_every = compress_every
         self.cluster = cluster
@@ -36,26 +32,12 @@ class OFListener:
         self._processed_reconstructed_times: List[str] = []
         self._deleted_reconstructed_times: List[str] = []
 
-    @staticmethod
-    def _is_valid_openfoam_dir(case_dir: Path) -> bool:
-        # To check that we're in an OpenFOAM case dir, check to see if we have:
-        # - a constant dir
-        # - a system dir
-        # - a processor0 dir
-        if not (case_dir / "constant").is_dir():
-            return False
-        if not (case_dir / "system").is_dir():
-            return False
-        if not (case_dir / "processor0").is_dir():
-            return False
-        return True
-
     def get_new_tasks(self) -> List[Task]:
         new_tasks: List[Task] = []
         # Get the current state of the files
-        split_times = self._get_split_times()
-        reconstructed_times = self._get_reconstructed_times()
-        tarred_times = self._get_tarred_times()
+        split_times = self.state.get_split_times()
+        reconstructed_times = self.state.get_reconstructed_times()
+        tarred_times = self.state.get_tarred_times()
         # Generate the new tasks based on the current state
         new_tasks.extend(self._process_split_times(split_times))
         new_tasks.extend(
@@ -76,7 +58,7 @@ class OFListener:
             if self._delete_without_processing(Decimal(t)):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
-            elif self._was_successfully_reconstructed(t):
+            elif self.state.is_reconstructed(t):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
             else:
@@ -91,7 +73,7 @@ class OFListener:
         for t in reconstructed_times:
             if t in self._processed_reconstructed_times:
                 continue
-            if not self._was_successfully_tarred(t):
+            if not self.state.is_tarred(t):
                 new_tasks.append(self._create_tar_task(t))
             # Delete its split time if it is not the last split time
             if split_times and t != split_times[-1]:
@@ -123,7 +105,7 @@ class OFListener:
         # reconstructPar still runs. This may not be desirable but hopefully
         # this is a rare occurance and so this solution should be good enough
         # Start with the most recent split time and work backwards from there
-        for t in reversed(self._get_split_times()):
+        for t in reversed(self.state.get_split_times()):
             task = self._create_reconstruct_task(t)
             task.run(block=True)
             if not task.was_successful():
@@ -134,8 +116,8 @@ class OFListener:
                 # Now try the next available split time
                 continue
         # Now remove any incompletely reconstructed times
-        for t in self._get_reconstructed_times():
-            if not self._was_successfully_reconstructed(t):
+        for t in self.state.get_reconstructed_times():
+            if not self.state.is_reconstructed(t):
                 new_tasks.append(self._create_delete_reconstructed_task(t))
         # We could remove any in progress tars, but these should theoreticaly
         # get dealt with when the time is tarred again (and are easier to spot)
@@ -150,9 +132,11 @@ class OFListener:
             raise Exception("This is not a cleaned directory.")
         # Remove the processor directories if there are no split times
         # These should get recreated when the job is created
-        if not self._get_split_times():
+        if not self.state.get_split_times():
             print("No split times left. Deleting all processor directories...")
-            Task(command=f"rm -rf {self.case_dir}/processor*").run(block=True)
+            Task(command=f"rm -rf {self.state.case_dir}/processor*").run(
+                block=True
+            )
         else:
             print("Found valid split times! Ready to proceed!")
             # We're done because this is a cleaned directory meaning that any
@@ -160,22 +144,24 @@ class OFListener:
             return
         # Further, make sure that there is a reconstructed time that can be
         # decomposed to recreate the processor directories
-        reconstructed_times = self._get_reconstructed_times()
+        reconstructed_times = self.state.get_reconstructed_times()
         if reconstructed_times:
             print("Found some reconstructed times! Ready to proceed!")
             # We're done because this is a cleaned directory meaning that any
             # reconstructed times are complete and can be decomposed
             return
         # Otherwise, look for the last tarred time and try to decompose that
-        tarred_times = self._get_tarred_times()
+        tarred_times = self.state.get_tarred_times()
         if tarred_times:
             # Decompose the most recent tarred time and then we're done
             newest_tar_time = tarred_times[-1]
             print(f"Untarring {newest_tar_time}...")
-            tar_path = f"{self.case_dir}/{newest_tar_time}.tar"
-            untar_command = f"tar -xvf {tar_path} --directory={self.case_dir}"
+            tar_path = f"{self.state.case_dir}/{newest_tar_time}.tar"
+            untar_command = (
+                f"tar -xvf {tar_path} --directory={self.state.case_dir}"
+            )
             reconstruction_done_marker_filepath = (
-                Path(self.case_dir)
+                Path(self.state.case_dir)
                 / newest_tar_time
                 / RECONSTRUCTION_DONE_MARKER_FILENAME
             )
@@ -198,44 +184,14 @@ class OFListener:
         quotient = timestep / self.keep_every
         return quotient % 1 != 0
 
-    def _get_split_times(self) -> List[str]:
-        processor0_directory = self.case_dir / "processor0"
-        return sorted(
-            [
-                t.name
-                for t in processor0_directory.glob("[0-9]*")
-                if t.is_dir()
-            ],
-            key=float,
-        )
-
-    def _get_reconstructed_times(self) -> List[str]:
-        return sorted(
-            [
-                t.name
-                for t in self.case_dir.glob("[0-9]*")
-                if t.is_dir()
-                and (t / RECONSTRUCTION_DONE_MARKER_FILENAME).is_file()
-            ],
-            key=float,
-        )
-
-    def _get_tarred_times(self) -> List[str]:
-        return sorted(
-            [
-                t.stem  # Remove the .tar file extension to get just the time
-                for t in self.case_dir.glob("[0-9]*.tar")
-            ]
-        )
-
     def _create_reconstruct_task(self, timestamp: str) -> Task:
         reconstruct_command = f"reconstructPar -time {timestamp}"
-        if self.case_dir != Path("."):
-            reconstruct_command += f" -case {self.case_dir}"
+        if self.state.case_dir != Path("."):
+            reconstruct_command += f" -case {self.state.case_dir}"
         if timestamp == "0":
             reconstruct_command += " -withZero"
         reconstruction_done_marker_filepath = (
-            Path(self.case_dir)
+            Path(self.state.case_dir)
             / timestamp
             / RECONSTRUCTION_DONE_MARKER_FILENAME
         )
@@ -251,27 +207,29 @@ class OFListener:
 
     def _create_delete_split_task(self, timestamp: str) -> Task:
         return Task(
-            command=f"rm -rf {self.case_dir}/processor*/{timestamp}",
+            command=f"rm -rf {self.state.case_dir}/processor*/{timestamp}",
             priority=0,
             short_string=f"DeleteSplit {timestamp}",
         )
 
     def _create_delete_reconstructed_task(self, timestamp: str) -> Task:
         return Task(
-            command=f"rm -rf {self.case_dir}/{timestamp}",
+            command=f"rm -rf {self.state.case_dir}/{timestamp}",
             priority=0,
             short_string=f"DeleteReconstructed {timestamp}",
         )
 
     def _create_tar_task(self, timestamp: str) -> Task:
         reconstruction_done_marker_filepath = (
-            Path(self.case_dir)
+            Path(self.state.case_dir)
             / timestamp
             / RECONSTRUCTION_DONE_MARKER_FILENAME
         )
-        tar_in_progress_path = f"{self.case_dir}/{timestamp}.tar.inprogress"
-        tar_path = f"{self.case_dir}/{timestamp}.tar"
-        timestamp_path = f"{self.case_dir}/{timestamp}"
+        tar_in_progress_path = (
+            f"{self.state.case_dir}/{timestamp}.tar.inprogress"
+        )
+        tar_path = f"{self.state.case_dir}/{timestamp}.tar"
+        timestamp_path = f"{self.state.case_dir}/{timestamp}"
         tar_command = (
             f"tar --exclude {reconstruction_done_marker_filepath} "
             + f"-cvf {tar_in_progress_path} {timestamp_path}"
@@ -281,34 +239,3 @@ class OFListener:
         return Task(
             command=command, priority=1, short_string=f"Tar {timestamp}"
         )
-
-    def _was_successfully_reconstructed(self, timestamp: str) -> bool:
-        reconstruction_done_marker_filepath = (
-            self.case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME
-        )
-        return (
-            self._was_successfully_tarred(timestamp)
-            or reconstruction_done_marker_filepath.is_file()
-        )
-
-    def _was_successfully_tarred(self, timestamp: str) -> bool:
-        if (self.case_dir / f"{timestamp}.tar").is_file():
-            return True
-        else:
-            return False
-
-    def _reconstructed_dir_exists(self, timestamp: str) -> bool:
-        # This checks that the directory exists
-        # It does not make any guarantees that it is fully written
-        if (self.case_dir / f"{timestamp}").is_dir():
-            return True
-        return False
-
-    def _split_exists(self, timestamp: str) -> bool:
-        # This checks that the split timestamp directory exists in at least one
-        # of the processor directories. It does not make any guarantees that it
-        # is fully written
-        for processor_directory in self.case_dir.glob("processor*"):
-            if (processor_directory / timestamp).is_dir():
-                return True
-        return False
