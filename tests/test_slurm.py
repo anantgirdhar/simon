@@ -409,7 +409,9 @@ def test_compress_does_run_when_not_started(
     generated_command = args[0].command
     assert mocked_task_run.mock_calls[0].kwargs == {"block": True}
     true_command = (
-        f"touch {cluster.case_dir}/{tgz_file}.queued"
+        f"cd {cluster.case_dir}"
+        + f" && touch {cluster.case_dir}/{tgz_file}.queued"
         + f" && sbatch {cluster.case_dir}/{COMPRESS_SFILE_NAME}.filled"
+        + f" && cd {os.getcwd()}"
     )
     assert generated_command == true_command
