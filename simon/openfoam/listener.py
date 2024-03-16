@@ -26,12 +26,11 @@ class OFListener:
         requeue: bool = True,
     ) -> None:
         self.state = state
-        self.keep_every = keep_every
-        if compress_every % keep_every != 0 or compress_every == keep_every:
-            raise ValueError(
-                f"{compress_every=} should be a multiple of {keep_every=}"
-            )
-        self.compress_every = compress_every
+        self.__verify_compress_every_and_keep_every_are_valid(
+            compress_every, keep_every
+        )
+        self._keep_every = keep_every
+        self._compress_every = compress_every
         self.cluster = cluster
         self.requeue = requeue
         self._requeued = False
@@ -248,3 +247,37 @@ class OFListener:
         return Task(
             command=command, priority=1, short_string=f"Tar {timestamp}"
         )
+
+    @staticmethod
+    def __verify_compress_every_and_keep_every_are_valid(
+        compress_every: Decimal, keep_every: Decimal
+    ) -> bool:
+        if compress_every % keep_every != 0 or compress_every == keep_every:
+            raise ValueError(
+                f"Compress every ({compress_every})"
+                f" should be a multiple of"
+                f" keep every ({keep_every})"
+            )
+        return True
+
+    @property
+    def compress_every(self) -> Decimal:
+        return self._compress_every
+
+    @compress_every.setter
+    def compress_every(self, value: Decimal) -> None:
+        self.__verify_compress_every_and_keep_every_are_valid(
+            value, self.keep_every
+        )
+        self._compress_every = value
+
+    @property
+    def keep_every(self) -> Decimal:
+        return self._keep_every
+
+    @keep_every.setter
+    def keep_every(self, value: Decimal) -> None:
+        self.__verify_compress_every_and_keep_every_are_valid(
+            self.compress_every, value
+        )
+        self._keep_every = value
