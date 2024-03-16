@@ -62,6 +62,12 @@ class OFFileState:
             key=float,
         )
 
+    def get_compressed_files(self) -> List[str]:
+        compressed_files = [t.name for t in self.case_dir.glob("times_*.tgz")]
+        # Sort the compressed files by the start time
+        # The format of the compressed files is times_start_end_step.tgz
+        return sorted(compressed_files, key=lambda fn: float(fn.split("_")[1]))
+
     def is_reconstructed(self, timestamp: str) -> bool:
         reconstruction_done_marker_filepath = (
             self.case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME

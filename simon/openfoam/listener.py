@@ -39,6 +39,7 @@ class OFListener:
         self._processed_reconstructed_times: List[str] = []
         self._deleted_reconstructed_times: List[str] = []
         self._requested_compressed_files: List[str] = []
+        self._deleted_tarred_times: List[str] = []
 
     def get_new_tasks(self) -> List[Task]:
         new_tasks: List[Task] = []
@@ -46,12 +47,16 @@ class OFListener:
         split_times = self.state.get_split_times()
         reconstructed_times = self.state.get_reconstructed_times()
         tarred_times = self.state.get_tarred_times()
+        compressed_files = self.state.get_compressed_files()
         # Generate the new tasks based on the current state
         new_tasks.extend(self._process_split_times(split_times))
         new_tasks.extend(
             self._process_reconstructed_times(reconstructed_times, split_times)
         )
         new_tasks.extend(self._process_tarred_times(tarred_times))
+        new_tasks.extend(
+            self._process_compressed_files(compressed_files, tarred_times)
+        )
         return new_tasks
 
     def _process_split_times(self, split_times: List[str]) -> List[Task]:
@@ -159,6 +164,18 @@ class OFListener:
                     continue
                 self.cluster.compress(tgz_filename, compression_candidate)
                 self._requested_compressed_files.append(tgz_filename)
+
+    def _process_compressed_files(
+        self, compressed_files: List[str], tarred_times: List[str]
+    ) -> List[Task]:
+        new_tasks: List[Task] = []
+        for t in tarred_times:
+            if not self.state.is_compressed(t):
+                continue
+            if t in self._deleted_tarred_times:
+                continue
+            new_tasks.append(self._create_delete_tar_task(t))
+        return new_tasks
 
     def get_cleanup_tasks(self) -> List[Task]:
         # Run this function to remove any incomplete items
@@ -306,6 +323,13 @@ class OFListener:
         command = " && ".join([tar_command, post_tar_command])
         return Task(
             command=command, priority=1, short_string=f"Tar {timestamp}"
+        )
+
+    def _create_delete_tar_task(self, timestamp: str) -> Task:
+        return Task(
+            command=f"rm {self.state.case_dir}/{timestamp}.tar",
+            priority=4,
+            short_string=f"DeleteTar {timestamp}",
         )
 
     @staticmethod
