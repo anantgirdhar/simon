@@ -319,3 +319,38 @@ def test_split_exists_returns_true_even_if_only_in_processor1(
             continue
         shutil.rmtree(d / "0.1")
     assert state.split_exists("0.1")
+
+
+# Test utility methods
+
+
+@pytest.mark.parametrize(
+    "start, end, step, tgz_filename",
+    [
+        ("0", "0.15", "0.05", "times_0_0.15_0.05.tgz"),
+        ("0", "0.1", "0.05", "times_0_0.1_0.05.tgz"),
+        ("1", "1.15", "0.05", "times_1_1.15_0.05.tgz"),
+        ("0.8", "0.95", "0.05", "times_0.8_0.95_0.05.tgz"),
+        ("1", "2", "0.05", "times_1_2_0.05.tgz"),
+    ],
+)
+def test_create_compressed_filename_with_valid_arguments(
+    state: OFFileState, start: str, end: str, step: str, tgz_filename: str
+) -> None:
+    assert state.create_compressed_filename(start, end, step) == tgz_filename
+
+
+@pytest.mark.parametrize(
+    "start", ["", "a", "1.a", "a.1", "0.a", "a.0", "a.", ".a"]
+)
+@pytest.mark.parametrize(
+    "end", ["", "a", "1.a", "a.1", "0.a", "a.0", "a.", ".a"]
+)
+@pytest.mark.parametrize(
+    "step", ["", "a", "1.a", "a.1", "0.a", "a.0", "a.", ".a"]
+)
+def test_create_compressed_filename_with_invalid_arguments_raises_value_error(
+    state: OFFileState, start: str, end: str, step: str
+) -> None:
+    with pytest.raises(ValueError):
+        state.create_compressed_filename(start, end, step)

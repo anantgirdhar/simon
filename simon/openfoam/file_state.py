@@ -1,7 +1,7 @@
 import decimal
 from decimal import Decimal
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 RECONSTRUCTION_DONE_MARKER_FILENAME = ".__reconstruction_done"
 
@@ -105,3 +105,35 @@ class OFFileState:
             if (processor_directory / timestamp).is_dir():
                 return True
         return False
+
+    @staticmethod
+    def create_compressed_filename(start: str, end: str, step: str) -> str:
+        try:
+            Decimal(start)
+        except decimal.InvalidOperation:
+            raise ValueError(
+                f"start {start} must be a string that can be turned into a float"
+            )
+        try:
+            Decimal(end)
+        except decimal.InvalidOperation:
+            raise ValueError(
+                f"end {end} must be a string that can be turned into a float"
+            )
+        try:
+            Decimal(step)
+        except decimal.InvalidOperation:
+            raise ValueError(
+                f"step {step} must be a string that can be turned into a float"
+            )
+        return f"times_{start}_{end}_{step}.tgz"
+
+    @staticmethod
+    def extract_compressed_file_params(
+        filename: str,
+    ) -> Tuple[Decimal, Decimal, Decimal]:
+        # Remove the file extension
+        filename = Path(filename).stem
+        # Everything should now be separated by underscores
+        _, start, end, step = filename.split("_")
+        return (Decimal(start), Decimal(end), Decimal(step))
