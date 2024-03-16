@@ -281,3 +281,12 @@ class OFListener:
             compress_every=self.compress_every, keep_every=value
         )
         self._keep_every = value
+
+    def update_processing_frequencies(
+        self, *, keep_every: Decimal, compress_every: Decimal
+    ) -> None:
+        self.__verify_compress_every_and_keep_every_are_valid(
+            compress_every=compress_every, keep_every=keep_every
+        )
+        self._keep_every = keep_every
+        self._compress_every = compress_every
