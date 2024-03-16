@@ -79,7 +79,7 @@ def listener(decomposed_case_dir: Path) -> OFListener:
     return OFListener(
         state=OFFileState(decomposed_case_dir),
         keep_every=Decimal("0.0001"),
-        compress_every=Decimal("0.01"),
+        compress_every=Decimal("3000"),
         cluster=Mock(spec=["requeue_job", "compress"]),
     )
 
