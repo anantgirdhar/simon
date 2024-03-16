@@ -27,6 +27,10 @@ class OFListener:
     ) -> None:
         self.state = state
         self.keep_every = keep_every
+        if compress_every % keep_every != 0 or compress_every == keep_every:
+            raise ValueError(
+                f"{compress_every=} should be a multiple of {keep_every=}"
+            )
         self.compress_every = compress_every
         self.cluster = cluster
         self.requeue = requeue
