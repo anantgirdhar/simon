@@ -80,9 +80,7 @@ class OFFileState:
         if not filename.startswith("times_"):
             return False
         try:
-            Decimal(filename.split("_")[1])
-            Decimal(filename.split("_")[2])
-            Decimal(filename.split("_")[3])
+            self.extract_compressed_file_params(filename)
         except decimal.InvalidOperation:
             return False
         if (self.case_dir / filename).is_file():
