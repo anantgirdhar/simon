@@ -23,11 +23,14 @@ class OFListener:
         keep_every: Decimal,
         compress_every: Decimal,
         cluster: ExternalJobManager,
+        requeue: bool = True,
     ) -> None:
         self.state = state
         self.keep_every = keep_every
         self.compress_every = compress_every
         self.cluster = cluster
+        self.requeue = requeue
+        self._requeued = False
         self._processed_split_times: List[str] = []
         self._processed_reconstructed_times: List[str] = []
         self._deleted_reconstructed_times: List[str] = []
@@ -64,6 +67,8 @@ class OFListener:
             else:
                 new_tasks.append(self._create_reconstruct_task(t))
                 self._processed_split_times.append(t)
+                if self.requeue and not self._requeued:
+                    self.cluster.requeue_job()
         return new_tasks
 
     def _process_reconstructed_times(
