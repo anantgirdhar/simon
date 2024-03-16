@@ -82,3 +82,8 @@ def listener(decomposed_case_dir: Path) -> OFListener:
         compress_every=Decimal("0.01"),
         cluster=Mock(spec=["requeue_job", "compress"]),
     )
+
+
+@pytest.fixture
+def times() -> List[str]:
+    return sorted(TEST_TIMESTAMP_STRINGS, key=float)

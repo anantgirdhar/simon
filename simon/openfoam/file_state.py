@@ -56,17 +56,15 @@ class OFFileState:
             [
                 t.stem  # Remove the .tar file extension to get just the time
                 for t in self.case_dir.glob("[0-9]*.tar")
-            ]
+            ],
+            key=float,
         )
 
     def is_reconstructed(self, timestamp: str) -> bool:
         reconstruction_done_marker_filepath = (
             self.case_dir / timestamp / RECONSTRUCTION_DONE_MARKER_FILENAME
         )
-        return (
-            self.is_tarred(timestamp)
-            or reconstruction_done_marker_filepath.is_file()
-        )
+        return reconstruction_done_marker_filepath.is_file()
 
     def is_tarred(self, timestamp: str) -> bool:
         if (self.case_dir / f"{timestamp}.tar").is_file():

@@ -58,7 +58,7 @@ class OFListener:
             if self._delete_without_processing(Decimal(t)):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
-            elif self.state.is_reconstructed(t):
+            elif self.state.is_reconstructed(t) or self.state.is_tarred(t):
                 new_tasks.append(self._create_delete_split_task(t))
                 self._processed_split_times.append(t)
             else:
