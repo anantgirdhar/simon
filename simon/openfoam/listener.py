@@ -148,12 +148,10 @@ class OFListener:
             compression_candidate.append(t)
             if len(compression_candidate) == num_tars_to_compress:
                 # We've found a complete compression candidate
-                tgz_filename = (
-                    f"times"
-                    f"_{compression_candidate[0]}"
-                    f"_{compression_candidate[-1]}"
-                    f"_{self.keep_every}"
-                    f".tgz"
+                tgz_filename = self.state.create_compressed_filename(
+                    start=compression_candidate[0],
+                    end=compression_candidate[-1],
+                    step=str(self.keep_every),
                 )
                 if tgz_filename in self._requested_compressed_files:
                     continue
