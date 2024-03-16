@@ -541,3 +541,20 @@ def test_deletes_tarred_times_when_compressed(
         print(tasks)
         print(required_task in tasks)
         assert required_task in tasks
+
+
+def test_does_not_create_duplicate_tar_deletion_tasks(
+    listener: OFListener,
+) -> None:
+    create_compressed_files(listener.state.case_dir, ["times_0_0.15_0.05.tgz"])
+    times = ["0", "0.05", "0.1", "0.15", "0.2"]
+    times_to_delete = ["0", "0.05", "0.1", "0.15"]
+    create_reconstructed_tars(listener.state.case_dir, times)
+    tasks = listener.get_new_tasks()
+    # Make sure that the tar deletion tasks did get created
+    for t in times_to_delete:
+        required_task = listener._create_delete_tar_task(t)
+        assert required_task in tasks
+    # Running again should not create any new tar deletion tasks
+    tasks = listener.get_new_tasks()
+    assert len(tasks) == 0

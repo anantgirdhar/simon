@@ -171,6 +171,7 @@ class OFListener:
             if t in self._deleted_tarred_times:
                 continue
             new_tasks.append(self._create_delete_tar_task(t))
+            self._deleted_tarred_times.append(t)
         return new_tasks
 
     def get_cleanup_tasks(self) -> List[Task]:
