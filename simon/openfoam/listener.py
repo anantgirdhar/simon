@@ -54,9 +54,7 @@ class OFListener:
             self._process_reconstructed_times(reconstructed_times, split_times)
         )
         new_tasks.extend(self._process_tarred_times(tarred_times))
-        new_tasks.extend(
-            self._process_compressed_files(compressed_files, tarred_times)
-        )
+        new_tasks.extend(self._process_compressed_files(tarred_times))
         return new_tasks
 
     def _process_split_times(self, split_times: List[str]) -> List[Task]:
@@ -165,9 +163,7 @@ class OFListener:
                 self.cluster.compress(tgz_filename, compression_candidate)
                 self._requested_compressed_files.append(tgz_filename)
 
-    def _process_compressed_files(
-        self, compressed_files: List[str], tarred_times: List[str]
-    ) -> List[Task]:
+    def _process_compressed_files(self, tarred_times: List[str]) -> List[Task]:
         new_tasks: List[Task] = []
         for t in tarred_times:
             if not self.state.is_compressed(t):
