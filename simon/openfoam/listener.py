@@ -27,7 +27,7 @@ class OFListener:
     ) -> None:
         self.state = state
         self.__verify_compress_every_and_keep_every_are_valid(
-            compress_every, keep_every
+            compress_every=compress_every, keep_every=keep_every
         )
         self._keep_every = keep_every
         self._compress_every = compress_every
@@ -250,7 +250,7 @@ class OFListener:
 
     @staticmethod
     def __verify_compress_every_and_keep_every_are_valid(
-        compress_every: Decimal, keep_every: Decimal
+        *, compress_every: Decimal, keep_every: Decimal
     ) -> bool:
         if compress_every % keep_every != 0 or compress_every == keep_every:
             raise ValueError(
@@ -267,7 +267,7 @@ class OFListener:
     @compress_every.setter
     def compress_every(self, value: Decimal) -> None:
         self.__verify_compress_every_and_keep_every_are_valid(
-            value, self.keep_every
+            compress_every=value, keep_every=self.keep_every
         )
         self._compress_every = value
 
@@ -278,6 +278,6 @@ class OFListener:
     @keep_every.setter
     def keep_every(self, value: Decimal) -> None:
         self.__verify_compress_every_and_keep_every_are_valid(
-            self.compress_every, value
+            compress_every=self.compress_every, keep_every=value
         )
         self._keep_every = value
