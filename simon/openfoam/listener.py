@@ -157,7 +157,7 @@ class OFListener:
                 )
                 if tgz_filename in self._requested_compressed_files:
                     continue
-                if self.state.is_compressed(tgz_filename):
+                if self.state.is_compressed_file(tgz_filename):
                     continue
                 self.cluster.compress(tgz_filename, compression_candidate)
                 self._requested_compressed_files.append(tgz_filename)

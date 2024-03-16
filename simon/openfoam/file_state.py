@@ -1,3 +1,5 @@
+import decimal
+from decimal import Decimal
 from pathlib import Path
 from typing import List
 
@@ -72,7 +74,17 @@ class OFFileState:
         else:
             return False
 
-    def is_compressed(self, filename: str) -> bool:
+    def is_compressed_file(self, filename: str) -> bool:
+        if not filename.endswith(".tgz"):
+            return False
+        if not filename.startswith("times_"):
+            return False
+        try:
+            Decimal(filename.split("_")[1])
+            Decimal(filename.split("_")[2])
+            Decimal(filename.split("_")[3])
+        except decimal.InvalidOperation:
+            return False
         if (self.case_dir / filename).is_file():
             return True
         else:
