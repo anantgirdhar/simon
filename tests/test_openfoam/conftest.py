@@ -64,6 +64,11 @@ def create_reconstructed_tars(case_dir: Path, timestamps: List[str]) -> None:
         (case_dir / f"{timestamp}.tar").touch()
 
 
+def create_compressed_files(case_dir: Path, filenames: List[str]) -> None:
+    for filename in filenames:
+        (case_dir / filename).touch()
+
+
 @pytest.fixture
 def decomposed_case_dir(tmp_path: Path) -> Path:
     case_dir = tmp_path

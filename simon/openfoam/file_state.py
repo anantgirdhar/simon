@@ -72,6 +72,12 @@ class OFFileState:
         else:
             return False
 
+    def is_compressed(self, filename: str) -> bool:
+        if (self.case_dir / filename).is_file():
+            return True
+        else:
+            return False
+
     def reconstructed_dir_exists(self, timestamp: str) -> bool:
         # This checks that the directory exists
         # It does not make any guarantees that it is fully written

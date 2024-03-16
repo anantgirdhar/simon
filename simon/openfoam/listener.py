@@ -1,3 +1,4 @@
+import math
 from decimal import Decimal
 from pathlib import Path
 from typing import List, Protocol
@@ -37,6 +38,7 @@ class OFListener:
         self._processed_split_times: List[str] = []
         self._processed_reconstructed_times: List[str] = []
         self._deleted_reconstructed_times: List[str] = []
+        self._requested_compressed_files: List[str] = []
 
     def get_new_tasks(self) -> List[Task]:
         new_tasks: List[Task] = []
@@ -98,7 +100,67 @@ class OFListener:
                 continue
             new_tasks.append(self._create_delete_reconstructed_task(t))
             self._deleted_reconstructed_times.append(t)
+        self._compress_tars(tarred_times)
         return new_tasks
+
+    def _compress_tars(self, tarred_times: List[str]) -> None:
+        # We can find how many timestamps are in each compression candidate
+        # because compress_every is a multiple of keep_every
+        num_tars_to_compress = int(self.compress_every / self.keep_every)
+        # If we don't have enough tars, then we can just quit here
+        if len(tarred_times) < num_tars_to_compress:
+            return
+        # Idea:
+        # let ce = how often we need to compress files (compress_every)
+        # let t0 = the first tarred time available
+        # let tN = the last tarred time available
+        t0 = Decimal(tarred_times[0])
+        tN = Decimal(tarred_times[-1])
+        # Let i be an integer > 1
+        # Then we can express the start times as: ts_i = i * ce
+        # We'll define the end times as: te_i = ts_i + ce
+        # This should work similar to python range objects which do not include
+        # the end value in the list of items
+        # Now we can find the list of start times that are currently available
+        # To do this, we can find the values of i corresponding to the first
+        # available start time and last available start time
+        i_start = math.floor(t0 / self.compress_every)
+        i_end = math.ceil(tN / self.compress_every)
+        start_times = iter(
+            [i * self.compress_every for i in range(i_start, i_end + 1)]
+        )
+        # Now we can loop over the available times to see if we have the tars
+        # needed for each compression candidate
+        # And all the times are sorted so that should make things a lot easier
+        ts = next(start_times)
+        # Next we can find the corresponding end time
+        te = ts + self.compress_every
+        # Create a list that will store the current compression candidate
+        compression_candidate: List[str] = []
+        for t in tarred_times:
+            if Decimal(t) < ts:
+                continue
+            if Decimal(t) >= te:
+                # We've started the next compression candidate
+                ts = next(start_times)
+                te = ts + self.compress_every
+                compression_candidate = []
+            compression_candidate.append(t)
+            if len(compression_candidate) == num_tars_to_compress:
+                # We've found a complete compression candidate
+                tgz_filename = (
+                    f"times"
+                    f"_{compression_candidate[0]}"
+                    f"_{compression_candidate[-1]}"
+                    f"_{self.keep_every}"
+                    f".tgz"
+                )
+                if tgz_filename in self._requested_compressed_files:
+                    continue
+                if self.state.is_compressed(tgz_filename):
+                    continue
+                self.cluster.compress(tgz_filename, compression_candidate)
+                self._requested_compressed_files.append(tgz_filename)
 
     def get_cleanup_tasks(self) -> List[Task]:
         # Run this function to remove any incomplete items
