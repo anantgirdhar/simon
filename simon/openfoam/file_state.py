@@ -74,6 +74,22 @@ class OFFileState:
         else:
             return False
 
+    def is_compressed(self, timestamp: str) -> bool:
+        # Check if this timestamp is in any of the compressed files based on
+        # the filename
+        t = Decimal(timestamp)
+        for compressed_file in self.case_dir.glob("times_*.tgz"):
+            start_time, end_time, step = self.extract_compressed_file_params(
+                compressed_file.name
+            )
+            if t < start_time:
+                continue
+            if t > end_time:
+                continue
+            if t % step == 0:
+                return True
+        return False
+
     def is_compressed_file(self, filename: str) -> bool:
         if not filename.endswith(".tgz"):
             return False

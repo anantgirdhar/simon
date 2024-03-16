@@ -5,7 +5,7 @@ from typing import Callable, List
 import pytest
 from simon.openfoam.file_state import OFFileState
 from tests.test_openfoam.conftest import (
-    create_reconstructed_tars,
+    create_compressed_files, create_reconstructed_tars,
     create_reconstructed_timestamps_with_done_marker,
     create_reconstructed_timestamps_without_done_marker,
     create_split_timestamps)
@@ -211,6 +211,63 @@ def test_is_tarred_returns_false_when_only_others_are_present(
 ) -> None:
     create_extra_files(state.case_dir, ["0.1"])
     assert not state.is_tarred("0.1")
+
+
+@pytest.mark.parametrize(
+    "compressed_files, tarred_and_compressed_timestamps",
+    [
+        (["times_0_0.15_0.05.tgz"], ["0", "0.05", "0.1", "0.15"]),
+        (["times_0_0.1_0.05.tgz"], ["0", "0.05", "0.1"]),
+        (["times_1_1.15_0.05.tgz"], ["1", "1.05", "1.1", "1.15"]),
+        (["times_0.8_0.95_0.05.tgz"], ["0.8", "0.85", "0.9", "0.95"]),
+        (
+            ["times_1_2_0.05.tgz"],
+            ["1", "1.05", "1.1", "1.15", "1.85", "1.9", "1.95", "2"],
+        ),
+        (
+            ["times_0_0.1_0.05.tgz", "times_1_1.15_0.05.tgz"],
+            ["0", "0.05", "0.1", "1", "1.05", "1.1", "1.15"],
+        ),
+    ],
+)
+def test_is_compressed_returns_true_when_is_compressed(
+    state: OFFileState,
+    compressed_files: List[str],
+    tarred_and_compressed_timestamps: List[str],
+) -> None:
+    create_compressed_files(state.case_dir, compressed_files)
+    for t in tarred_and_compressed_timestamps:
+        assert state.is_compressed(t)
+
+
+@pytest.mark.parametrize(
+    "compressed_files, tarred_but_not_compressed_timestamps",
+    [
+        (["times_0_0.15_0.05.tgz"], ["0.2", "0.25", "0.3", "0.99", "1"]),
+        (["times_0_0.1_0.05.tgz"], ["0.11", "0.25", "0.3", "0.99", "1"]),
+        (["times_1_1.15_0.05.tgz"], ["0", "0.05", "0.1", "0.999", "1.2", "2"]),
+        (
+            ["times_0.8_0.95_0.05.tgz"],
+            ["0", "0.05", "0.1", "0.999", "1.2", "2"],
+        ),
+        (
+            ["times_1_2_0.05.tgz"],
+            ["0", "0.05", "0.1", "0.999", "2.0001", "3", "10"],
+        ),
+        (
+            ["times_0_0.1_0.05.tgz", "times_1_1.15_0.05.tgz"],
+            ["0.2", "0.5", "0.9", "1.2", "1.4"],
+        ),
+    ],
+)
+def test_is_compressed_returns_false_when_is_outside_range(
+    state: OFFileState,
+    compressed_files: List[str],
+    tarred_but_not_compressed_timestamps: str,
+) -> None:
+    create_compressed_files(state.case_dir, compressed_files)
+    for t in tarred_but_not_compressed_timestamps:
+        assert not state.is_compressed(t)
 
 
 def test_reconstructed_dir_exists_returns_true_when_reconstructed_time_exists(
